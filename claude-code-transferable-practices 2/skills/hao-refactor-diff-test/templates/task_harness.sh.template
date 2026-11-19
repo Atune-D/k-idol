@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+#
+# 后端等价差分 —— 单任务 harness 模板。复制到 <项目>/tools/refactor-diff-test/tasks/<task>.sh 后填空。
+# 骨架固定：搭临时库 → 旧SQL命中集 → 新真实代码命中集 → 逐层比对 → 报告 → 清理。
+#
+set -uo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+
+# 载入通用 helper（skill 目录）+ 每项目配置
+source "${HAO_DIFF_LIB:-$HOME/.claude/skills/hao-refactor-diff-test/lib/backend_diff_lib.sh}"
+CFG="$HERE/../refactor-diff-test-config.json"
+export EQ_SRC_HOST=$(jq -r .source.host "$CFG")
+export EQ_SRC_PORT=$(jq -r .source.port "$CFG")
+export EQ_SRC_USER=$(jq -r .source.user "$CFG")
+export EQ_SRC_PWD="${!$(jq -r .source.passwordEnv "$CFG")}"
+export EQ_SRC_DB=$(jq -r .source.db "$CFG")
+export EQ_TMP_DB="$(jq -r .tmpDbPrefix "$CFG")TASKNAME"
+export EQ_APP_DIR="$(cd "$HERE/../$(jq -r .appDir "$CFG")" && pwd)"
+export EQ_TZ=$(jq -r .timezone "$CFG")
+WORK="$(mktemp -d)"
+
+echo "── 搭建一次性临时库 ──"
+eq_reset_tmp_db
+eq_copy_all   merchants                                  # 例：小维表全量
+eq_copy_where orders "order_status IN ('fake','pending')" # 例：巨表只拷必要子集
+eq_copy_struct auto_tasks
+eq_apply_migration_col auto_tasks "param_json JSON NULL AFTER param"  # 模拟部署后迁移
+
+echo "── Layer 1：选择集差分（旧转写SQL vs 新真实代码）──"
+# 旧侧：独立转写自旧源码的 SQL（不抄新代码）
+eq_tmp_mysql "SELECT upid FROM merchants WHERE <旧谓词> ORDER BY upid;" | sort -n > "$WORK/old"
+# 新侧：真实新代码路径（scope / 命令），用 eq_artisan 打到临时库
+eq_artisan tinker --execute="\App\Merchant::activeFor('<channel>')->orderBy('upid')->pluck('upid')->each(fn(\$u)=>print(\$u.PHP_EOL));" \
+  2>/dev/null | grep -E '^[0-9]+$' | sort -n > "$WORK/new"
+eq_set_diff "L1-<task> 选择集" "$WORK/old" "$WORK/new"
+# 破坏性任务：用真实命令 --dry-run 的 matched 计数交叉验证谓词
+# eq_dryrun_crosscheck "L1-<task>" "$(wc -l <"$WORK/new")" <artisan-command> --dry-run
+
+echo "── Layer 2：写入行形状字节等价（若为生产者）──"
+# eq_tmp_mysql "TRUNCATE auto_tasks;"
+# eq_artisan <producer-command> --date="$(eq_yesterday)" >/dev/null 2>&1
+# NEW=$(eq_tmp_mysql "SELECT param FROM auto_tasks WHERE unisig='...';")
+# EXP=$(php -r "echo serialize([...]);")   # 独立复算旧 serialize
+# eq_byte_eq "L2-<task> param 字节级" "$NEW" "$EXP"
+
+echo "── Layer 3：破坏性副作用（可选，需真执行于临时库）──"
+# 真跑破坏性命令于临时库，比对级联删除/归档字段。临时库一次性，安全。
+
+rm -rf "$WORK"
+eq_report
+# eq_drop_tmp_db   # 需要复查时先别删

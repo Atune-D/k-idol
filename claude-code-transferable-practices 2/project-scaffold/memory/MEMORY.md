@@ -1,0 +1,1 @@
+- [示例：git 多仓库纪律](example-git-multi-repo-discipline.md) — commit 必须显式 -C；禁止裸 add -A
