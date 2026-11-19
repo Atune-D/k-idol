@@ -1,0 +1,9 @@
+# Project toolchain pinned with Rokit (https://github.com/rojo-rbx/rokit).
+# Versions match the tools installed on the development machine on 2026-11-19.
+# Run `rokit install` in this folder to install exactly these versions.
+
+[tools]
+rojo = "rojo-rbx/rojo@7.7.1"
+lune = "lune-org/lune@0.11.1"
+StyLua = "JohnnyMorganz/StyLua@2.6.0"
+selene = "Kampfkarren/selene@0.32.0"

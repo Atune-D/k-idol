@@ -1,0 +1,4 @@
+# Lint configuration for selene (https://kampfkarren.github.io/selene/).
+# All code targets Roblox Luau. Test files also run under Lune; they only use
+# `require("@lune/...")`, which needs no extra globals.
+std = "roblox"

@@ -2,11 +2,15 @@
 
 > A Roblox idol dress-up game: style an outfit to a theme, perform a dance on stage, get scored by the system, earn Star Coins and fans.
 
-- **Version**: v1.0 (2026-11-19) — first draft of the new direction. **Status: awaiting owner confirmation. No code exists yet.**
+- **Version**: v1.3 (2026-11-19) — records the results of the Phase 1 trials, run in Roblox Studio (§8, §10). The design holds: un-owned Marketplace items, shoe bundles and makeup can all be worn. Changes: sellability is read from item details because bundle product info lacks it; dressing rules for layering order; the wardrobe preview is a device-only copy of the character; starter dance ids filled in.
+  - v1.2 (2026-11-19) — takes in a second external audit: six findings, all confirmed (§10). Changes: a reward and the record that makes it non-repeatable are one indivisible change; outfit drafts carry a sequence number, are acknowledged and are never dropped for arriving early; the server publishes the wardrobe catalog it validates against; stored outfits survive unavailable items; a character that respawns is put back into the state its player is in; the publishing threshold is now 100.
+  - v1.1 (2026-11-19) — takes in an external audit of v1.0 and of the first code: five findings, all confirmed (§10). Changes: styling items can be Marketplace bundles, so a pair of shoes is one item; outfits are lists of styling item keys; items that cannot be sold in this game are hidden; purchase acceptance now requires a completed purchase; the leaderboard write can never lower a value; save starts are spaced per player and requests are rate-limited; save events hand each listener an isolated snapshot.
+  - v1.0 (2026-11-19) — first draft of the new direction. Confirmed by the owner the same day.
+- **Status**: implementation paused part-way. All existing code predates v1.1 and v1.2 and must be brought in line with this version.
 - **Supersedes**: [`../1119-rhythm-mvp/rhythm-mvp-development-spec.md`](../1119-rhythm-mvp/rhythm-mvp-development-spec.md) (the rhythm-game direction, dropped on 2026-11-19). Its save-data, leaderboard and publishing rules are carried into this document; its rhythm gameplay is not.
 - **Readers**: the engineering session that implements this; §0 is written for a non-engineer.
 - **Division of labour**: this is the only document for this initiative. There is no separate plan document yet; the reasons behind decisions are recorded in §0.3. 🔴 **If another document conflicts with this one, this one wins.**
-- **Modules involved**: `src/shared`, `src/server`, `src/client`, `data`, `tools`, `tests` (none exist yet; this document is their contract).
+- **Modules involved**: `src/shared`, `src/server`, `src/client`, `data`, `tools`, `tests` (partly written; this document is their contract).
 - **⛔ Do not touch**: `claude-code-transferable-practices 2/` (collaboration kit, read-only reference).
 - **Contract depth**: Phases 1–2 are specified as an engineering contract (§1–§6). Phases 3–4 are specified at design level only (§7) and get their own contract before they are built.
 - **Out of scope for all four phases**: team competition; player-to-player voting; selling Star Coins for Robux; trading; custom-made clothing; multi-language.
@@ -144,7 +148,7 @@ Then a 10-second break, and the next round starts by itself with a new theme. On
 **Things to know before agreeing**
 
 **A. Players under 16 are not reachable at launch.**
-- What: Roblox publishes in tiers. Reaching 16+ only needs an age-checked account. Reaching under-16s additionally needs ID verification, 2-step verification, a fee or subscription, and passing an evaluation: a set number of "highly engaged", age-checked 16+ players within 60 days. The documented number on 2026-11-19 is 250; it was 500 before August 2026 and may drop further.
+- What: Roblox publishes in tiers. Reaching 16+ only needs an age-checked account. Reaching under-16s additionally needs ID verification, 2-step verification, a fee or subscription, and passing an evaluation: a set number of "highly engaged", age-checked 16+ players within 60 days. The documented number is 100. It was 500 until August 2026 and 250 until 2026-11-19, the day this was written; it may change again.
 - Why it matters: the natural audience for an idol dress-up game is under 16.
 - If ignored: the game launches and its target audience cannot find it. Details in §5.3.
 
@@ -159,7 +163,7 @@ Then a 10-second break, and the next round starts by itself with a new theme. On
 
 **D. The dance pipeline is unproven.**
 - What: phone video → 3D motion → Blender → Roblox animation has not been run end to end. The owner has no Windows machine with an NVIDIA GPU, which the originally proposed tool requires. Current estimate of success at acceptable quality: about 50%.
-- Mitigation: the game is built with Roblox's own dance animations as placeholders, so the rest does not wait. See §8.
+- Mitigation: the game is built with Roblox's own dance animations as placeholders, so the rest does not wait. Three were confirmed to work in the trial (§3.8). They are very plain, so the game has nothing distinctive to sell until owner-made dances exist.
 
 **E. Saves are protected across servers, at the cost of occasional waiting.**
 - What: a save can be held by only one server at a time. A player who leaves one server and immediately joins another waits until the first one hands the save back.
@@ -189,6 +193,19 @@ Then a 10-second break, and the next round starts by itself with a new theme. On
 | 18 | Publishing tier | ⬜ Undecided: publish to 16+ and go through the normal evaluation, or pay for expedited review. See §5.3 | Owner to decide | — |
 | 19 | Save protection across servers | Included from Phase 1 | Carried from the previous spec | 2026-11-19 |
 | 20 | Leaderboard update timing | Only after the save has been written | Carried from the previous spec | 2026-11-19 |
+| 21 | Code comment language | English | Owner | 2026-11-19 |
+| 22 | Shoes | A pair of shoes is one styling item backed by a Marketplace bundle; the item pool distinguishes assets from bundles | Audit finding, confirmed in official docs; AI adopted | 2026-11-19 |
+| 23 | Items that cannot be bought in this game | Hidden from the wardrobe and logged | Audit finding, confirmed in official docs; AI adopted | 2026-11-19 |
+| 24 | Leaderboard writes | Atomic "keep the larger of the stored and the saved value" | Audit finding; AI adopted | 2026-11-19 |
+| 25 | Save frequency | Save starts spaced at least 10 seconds apart per player; appearance changes do not trigger a save; every request channel is rate-limited on the server | Audit finding; AI adopted | 2026-11-19 |
+
+| 26 | Rewards and their records | One indivisible in-memory change per grant or spend | Audit finding; AI adopted | 2026-11-19 |
+| 27 | Outfit drafts | Sequence number, acknowledgement, resend; the server coalesces instead of refusing | Audit finding; AI adopted | 2026-11-19 |
+| 28 | Wardrobe contents on the device | Taken from a catalog the server publishes, the same one it validates against | Audit finding; AI adopted | 2026-11-19 |
+| 29 | Stored outfit with unavailable items | Wear what is available; remove a key from the save only when the item has left the pool | Audit finding; AI adopted | 2026-11-19 |
+| 30 | Character respawn | The server re-applies whatever the player's current state calls for | Audit finding; AI adopted | 2026-11-19 |
+
+On 2026-11-19 the owner confirmed v1.0 as a whole, which settles decisions 5 and 11–17. Decision 18 remains open.
 
 ---
 
@@ -212,17 +229,33 @@ Fixed lists. An item or theme may only use values from these lists.
 
 The owner maintains a spreadsheet exported as `data/styling-item-pool.csv`. A tool in `tools/` validates it and generates `src/shared/generated/StylingItemPool.luau`. 🔴 The generated file is never edited by hand.
 
+A **styling item** is one thing a player puts on and one thing the scoring counts. It is backed by either a single Marketplace asset or a Marketplace bundle. Roblox shoes are two separate assets, left and right, sold together as a bundle; a pair of shoes is therefore one styling item of kind `Bundle`.
+
 | Column / field | Type | Example | Notes |
 |---|---|---|---|
-| `marketplaceAssetId` | number | `1234567890` | The Marketplace item's id |
+| `marketplaceItemKind` | `Asset` or `Bundle` | `Asset` | What the id below refers to, and what the player buys |
+| `marketplaceItemId` | number | `1234567890` | The asset id or the bundle id |
 | `itemSlot` | `itemSlot` | `top` | Exactly one |
 | `styleTags` | list of `styleTag` | `y2k, cute` | One to three |
 | `primaryColorTag` | `colorTag` | `pink` | Exactly one |
 | `isEnabled` | boolean | `true` | `false` hides the item without deleting the row |
 
-The tool rejects the file if any value is outside the vocabularies, an id is duplicated, or a row has no style tag.
+The tool derives `stylingItemKey` for each row: `asset_<marketplaceItemId>` or `bundle_<marketplaceItemId>`. This key is how the rest of the game refers to the item.
 
-Item name, price and thumbnail are **not** stored here. They are read from Roblox at run time. An item that fails to load or is no longer on sale is hidden for that server session and logged.
+The tool rejects the file if any value is outside the vocabularies, a `stylingItemKey` is duplicated, a row has no style tag, a `shoes` row is not of kind `Bundle`, or a row in any other slot is not of kind `Asset`.
+
+**Read from Roblox at run time, not stored here** (by the server, once per server session, then cached):
+
+| What | For |
+|---|---|
+| Name, price, thumbnail | Display |
+| For a bundle: the list of assets it contains | Dressing the character |
+| Whether the item can be bought, and where it may be sold. Read from the avatar item details, which report both for assets and for bundles; bundle product info reports neither (§8) | Deciding whether to show it |
+| The Roblox asset type of every worn asset (for example hair accessory, left shoe, lip makeup, layered jacket) | Building the appearance correctly on the server and in the device preview |
+
+🔴 A styling item is hidden for that server session and logged when any of these holds: its details fail to load; it is not on sale; it cannot be sold in this game; it is a bundle whose contents fail to load. A hidden item is treated as not being in the pool: an outfit containing it is invalid.
+
+**Selection rules for the owner.** Pick only items that are on sale and whose creator allows sale in all experiences. An item restricted to the Marketplace or to its creator's own games can be shown by other games but not bought in them, so it earns nothing here.
 
 ### 1.3 Themes (`src/shared/ThemeCatalog.luau`)
 
@@ -246,17 +279,26 @@ A style tag not listed in `styleTagWeights` has weight 0 for that theme.
 
 ### 1.5 Outfit and its validity (`src/shared/OutfitValidator.luau`)
 
-An outfit is a list of `marketplaceAssetId` values. It is valid when:
+An outfit is a list of `stylingItemKey` values. It is valid when:
 
 | # | Rule |
 |---|---|
-| 1 | Every id is an enabled row of the styling item pool |
-| 2 | No id appears twice |
+| 1 | Every key is an enabled, non-hidden styling item of the pool |
+| 2 | No key appears twice |
 | 3 | At most one item each in `hair`, `top`, `bottom`, `dress`, `shoes`, `makeup_eyes`, `makeup_lips`, `makeup_face`, `eyelashes`, `eyebrows` |
 | 4 | At most `MAX_ACCESSORY_ITEM_COUNT = 3` items in `accessory` |
 | 5 | A `dress` cannot be combined with a `top` or a `bottom` |
 
-An empty outfit is valid.
+An empty outfit is valid. Any subset of a valid outfit is valid.
+
+**Stored outfits that contain unavailable items.** `lobbyOutfitStylingItemKeys` was valid when stored; later an item may leave the pool or be hidden. The rules above apply to what a device **submits**. For what is already **stored**:
+
+| Case | Likely cause | When dressing | In the save |
+|---|---|---|---|
+| The key is no longer in the pool, or its row has `isEnabled = false` | The owner removed it; permanent | Skipped | Removed from `lobbyOutfitStylingItemKeys`, once, when the save is loaded |
+| The key is in the pool but hidden for this server session (§1.2) | Lookup failure, off sale, not sellable here; may be temporary | Skipped | 🔴 Kept. A temporary fault must never erase part of a stored outfit |
+
+The remaining items are worn. The player is told how many are unavailable (§2.6).
 
 ### 1.6 Scoring (`src/shared/OutfitScoreCalculator.luau`)
 
@@ -271,7 +313,7 @@ An empty outfit is valid.
 | `accessory` | any `accessory` item |
 | `makeup` | any of `makeup_eyes`, `makeup_lips`, `makeup_face`, `eyelashes`, `eyebrows` |
 
-A dress fills both `upperBody` and `lowerBody`.
+A dress fills both `upperBody` and `lowerBody`. A pair of shoes is one styling item and fills `shoes` once.
 
 **Item match** for a theme = the largest `styleTagWeights` value among the item's `styleTags` (0 if none is listed).
 
@@ -387,7 +429,7 @@ Standard data store `PlayerSaveData_v1`, key `player_<playerUserId>`.
 | `equippedDanceId` | string | `"starter_wave"` | unchanged |
 | `ownedCosmeticIds` | list | `{}` | unchanged |
 | `equippedCosmeticIdByKind` | map | `{}` | unchanged |
-| `lobbyOutfitAssetIds` | list | last outfit set in the lobby; empty means the player's own avatar | unchanged |
+| `lobbyOutfitStylingItemKeys` | list | last outfit set in the lobby; empty means the player's own avatar | unchanged |
 | `dailyProgress` | table | see below | see below |
 | `redeemedPromoCodeIds` | list | `{}` | unchanged |
 | `firstJoinedAtUnixSeconds` | number | fixed | fixed |
@@ -414,6 +456,7 @@ A new player starts with `fanCount = 0`, `starCoinBalance = 0`, every dance whos
 
 - Ordered data store `FanCountLeaderboard_v1`, key `tostring(playerUserId)`, value `fanCount`.
 - 🔴 Only a `fanCount` that has already been written to `PlayerSaveData_v1` may be written to the leaderboard. The leaderboard never shows more fans than the save holds.
+- 🔴 A leaderboard write never lowers the stored value (§3.5).
 - Each server reads the top 100 every 60 seconds and caches them. Devices read only the cache.
 
 ⚠️ An ordered data store cannot answer "what rank is this player". Ranks are shown for the top 100 only; everyone else sees "outside the top 100".
@@ -443,28 +486,51 @@ Constants: `THEME_REVEAL_SECONDS = 10`, `STYLING_SECONDS = 180`, `SHOWCASE_SECON
 
 Accepted during `ThemeReveal`, and during `Styling` while at least `MINIMUM_STYLING_SECONDS_TO_JOIN = 60` seconds remain.
 
-Rejection reasons: `SaveDataNotLoaded`, `RoundNotJoinableNow`, `AlreadyParticipating`.
+Rejection reasons: `SaveDataNotLoaded`, `WardrobeCatalogNotReady`, `RoundNotJoinableNow`, `AlreadyParticipating`, `TooManyRequests`.
 
 A participant who leaves the server is removed from the round and gets no reward for it.
 
-### 2.3 `SetRoundOutfitDraft` (device tells server; no answer)
+### 2.3 Outfit drafts: `SetRoundOutfitDraft` and `RoundOutfitDraftAcknowledged`
 
-`{ roundId, outfitAssetIds }`. The device sends it after each wardrobe change, at most once every `OUTFIT_DRAFT_MINIMUM_INTERVAL_SECONDS = 0.5`.
+**`SetRoundOutfitDraft`** (device tells server): `{ roundId, outfitDraftSequenceNumber, outfitStylingItemKeys }`.
 
-The server keeps the draft only when all of these hold; otherwise it ignores the message and keeps the previous draft:
+`outfitDraftSequenceNumber` starts at 1 for each player in each round and rises by 1 with every new draft the device produces.
 
-| # | Condition |
-|---|---|
-| 1 | The sender is a participant of the current round |
-| 2 | `roundId` matches the current round |
-| 3 | `roundPhase` is `Styling` |
-| 4 | `outfitAssetIds` is a valid outfit (§1.5) |
+**`RoundOutfitDraftAcknowledged`** (server → that device): `{ roundId, outfitDraftSequenceNumber, isKept, rejectionReason }`.
 
-🔴 At the end of `Styling` the server scores each participant's **last kept draft**. Nothing sent later counts.
+**What the server does with an arriving draft**
+
+| # | Check | If it fails |
+|---|---|---|
+| 1 | The sender is a participant of the current round, `roundId` matches, and `roundPhase` is `Styling` | Ignored, no acknowledgement |
+| 2 | `outfitDraftSequenceNumber` is higher than the highest this server has already processed for the player this round | Not processed again; the earlier acknowledgement for the highest processed draft is sent again |
+| 3 | At least `OUTFIT_DRAFT_SERVER_PROCESSING_INTERVAL_SECONDS = 0.25` has passed since this player's previous draft was processed | 🔴 **Not refused.** The draft waits in a one-place buffer; a newer draft arriving meanwhile replaces it. The waiting draft is processed as soon as the interval has passed |
+| 4 | `outfitStylingItemKeys` is a valid outfit (§1.5) | Acknowledged with `isKept = false` and `rejectionReason = "OutfitInvalid"`; the previously kept draft stays |
+
+A draft that passes all four becomes the player's **kept draft** and is acknowledged with `isKept = true`.
+
+**What the device does**
+
+- After each wardrobe change it sends the current outfit, at most once every `OUTFIT_DRAFT_SEND_INTERVAL_SECONDS = 0.5`. A change made inside that interval is sent when the interval ends, so the latest outfit is always eventually sent.
+- If the latest draft it sent has not been acknowledged after `OUTFIT_DRAFT_RESEND_AFTER_SECONDS = 1`, it sends it again with the same sequence number.
+- It shows the outfit as saved only when the latest draft is acknowledged as kept. On `isKept = false` it puts the preview back to the last kept draft and says so.
+- It locks the wardrobe `WARDROBE_LOCK_BEFORE_STYLING_END_SECONDS = 1` before `phaseEndsAtUnixMilliseconds`, so the last change has time to arrive.
+
+🔴 **Cut-off.** At the end of `Styling` the server first processes any draft still waiting in a buffer, then scores each participant's kept draft. Anything arriving later is ignored. The showcase and the results show the outfit that was scored, so a player always sees what was judged.
 
 ### 2.4 Showcase
 
-At the start of `Showcase` the server dresses each participant's character in their final outfit, places them on the stage and plays their `equippedDanceId`. Every device in the server sees it. At the end the server restores each participant's lobby appearance: their `lobbyOutfitAssetIds`, where an empty list means the player's own Roblox avatar. In Phase 1 the list is always empty.
+At the start of `Showcase` the server dresses each participant's character in their final outfit, places them on the stage and plays their `equippedDanceId`. Every device in the server sees it. At the end the server restores each participant's lobby appearance: the available part of their `lobbyOutfitStylingItemKeys` (§1.5), where an empty list means the player's own Roblox avatar. In Phase 1 the list is always empty.
+
+🔴 **Respawn.** Whenever a player's character spawns — on joining, after a reset, after falling out of the world — the server applies what that player's current state calls for:
+
+| Player's state | On spawn |
+|---|---|
+| Participant, during `Showcase` | The scored outfit, their place on the stage, and their dance started again |
+| Participant, during `Styling` | Lobby appearance from the server; the device re-applies its draft preview |
+| Anything else | Lobby appearance |
+
+A respawn never changes what was or will be scored.
 
 ### 2.5 `RoundResultsPublished` (server → every device, at the start of `Results`)
 
@@ -476,15 +542,17 @@ Sorted by `outfitScore`, highest first. Rewards are granted through the ledger (
 
 ### 2.6 `PlayerSaveDataSnapshotChanged` (server → the owning device)
 
-`{ fanCount, starCoinBalance, ownedDanceIds, equippedDanceId, ownedCosmeticIds, equippedCosmeticIdByKind, dailyProgress, todaysDailyQuestIds, isSaveDataPersistenceDelayed }`
+`{ fanCount, starCoinBalance, ownedDanceIds, equippedDanceId, ownedCosmeticIds, equippedCosmeticIdByKind, lobbyOutfitStylingItemKeys, unavailableLobbyOutfitStylingItemKeys, dailyProgress, todaysDailyQuestIds, isSaveDataPersistenceDelayed }`
+
+`unavailableLobbyOutfitStylingItemKeys` lists the stored keys that are hidden this session. When it is not empty the device shows "Some items of your saved outfit are unavailable right now."
 
 Sent once when the save has loaded, then whenever the in-memory save or the persistence state changes. 🔴 The device shows balances only from this message and never computes them itself.
 
 ### 2.7 `SetLobbyOutfit` (Phase 2; device asks, server answers)
 
-`{ outfitAssetIds }`. Accepted when the outfit is valid and the player is not a participant in the `Styling` or `Showcase` phase. The server dresses the character and stores `lobbyOutfitAssetIds`.
+`{ outfitStylingItemKeys }`. Accepted when the outfit is valid and the player is not a participant in the `Styling` or `Showcase` phase. The server dresses the character and stores `lobbyOutfitStylingItemKeys`.
 
-Rejection reasons: `SaveDataNotLoaded`, `OutfitInvalid`, `NotAllowedDuringRound`.
+Rejection reasons: `SaveDataNotLoaded`, `WardrobeCatalogNotReady`, `OutfitInvalid`, `NotAllowedDuringRound`, `TooManyRequests`.
 
 ### 2.8 Dance requests (Phase 2)
 
@@ -521,7 +589,52 @@ Answer: `{ leaderboardEntries, refreshedAtUnixSeconds }`, each entry `{ leaderbo
 
 ### 2.12 Buying a Marketplace item (Phase 2)
 
-The wardrobe shows a "Buy" button on items the player does not own. It opens Roblox's own purchase prompt. Roblox completes the purchase and delivers the item to the player's account; the game does not grant anything itself and stores nothing about it.
+The wardrobe shows a "Buy" button on a selected styling item the player does not own (ownership per §2.14). It opens Roblox's own purchase prompt: the asset prompt for kind `Asset`, the bundle prompt for kind `Bundle`. Ownership is likewise checked per kind. Roblox completes the purchase and delivers the item to the player's account; the game does not grant anything itself and stores nothing about it.
+
+Two conditions outside the code decide whether a purchase can complete and whether the game owner is paid:
+
+- 🔴 The game must have **Allow Third Party Sales** switched on (Experience Settings → Security). Without it, items made by other creators can be seen and not bought.
+- The item's creator must allow sale in this game. Items that do not are hidden (§1.2), so every item with a "Buy" button is one Roblox reports as sellable here.
+
+### 2.13 Request rate limits and no-op requests
+
+🔴 The server enforces a minimum interval per player per channel. A request arriving sooner is answered `{ isAccepted = false, rejectionReason = "TooManyRequests" }`, or ignored if the channel has no answer, and changes nothing.
+
+| Channel | Minimum interval (seconds) |
+|---|---|
+| `SetRoundOutfitDraft` | 0.25, and coalesced rather than refused (§2.3) |
+| `RequestWardrobeCatalogSnapshot` | 2 |
+| `RequestStylingItemOwnership` | 0.5 |
+| `RequestJoinCurrentRound` | 1 |
+| `SetLobbyOutfit` | 2 |
+| `RequestEquipDance`, `RequestEquipCosmetic` | 1 |
+| `RequestPurchaseDanceWithStarCoins`, `RequestPurchaseCosmeticWithStarCoins` | 1 |
+| `RequestClaimPlaytimeMilestone`, `RequestClaimDailyQuestReward` | 1 |
+| `RequestStartDanceInLobby`, `RequestSyncDanceWithPlayer`, `RequestStopDanceInLobby` | 0.5 |
+| `RequestRedeemPromoCode` | 2 (answers `TooManyAttempts`, as in §2.10) |
+| `RequestFanCountLeaderboardTopEntries` | 5 |
+
+🔴 A request that would leave the save exactly as it is (equipping what is already equipped, setting the lobby outfit to the current one) is accepted and does not count as a change: no revision bump, no save, no snapshot message.
+
+### 2.14 Wardrobe catalog
+
+The server decides which styling items are available (§1.2). The device must show exactly that set, with the same names, prices and bundle contents, or it would offer items whose drafts the server then rejects.
+
+`isWardrobeCatalogReady` is false from server start until `MarketplaceStylingItemResolver` has finished its first pass over the pool, retrying a failed lookup up to 3 times before hiding the item.
+
+**`RequestWardrobeCatalogSnapshot`** (device asks, server answers):
+
+`{ isAccepted = true, isWardrobeCatalogReady, wardrobeCatalogVersion, wardrobeItems }`, each item `{ stylingItemKey, marketplaceItemKind, marketplaceItemId, itemDisplayName, priceInRobux, wornAssets }`, where each worn asset is `{ wornAssetId, robloxAssetTypeName }`.
+
+- `wardrobeItems` holds every available item and no hidden one. It is empty while the catalog is not ready.
+- `wornAssets` is the single asset for kind `Asset`. For kind `Bundle` it is the bundle's wearable contents; a bundle also lists a saved-outfit entry, which is not wearable and is left out.
+- Slot and tags are not repeated here; the device reads them from the shared item pool by `stylingItemKey`.
+
+**`WardrobeCatalogChanged`** (server → every device): `{ isWardrobeCatalogReady, wardrobeCatalogVersion }`, sent when readiness or the version changes. A device then asks for the snapshot again.
+
+🔴 The server validates outfits against the catalog of the version it last published. Until the catalog is ready the wardrobe shows a loading state, and `RequestJoinCurrentRound` and `SetLobbyOutfit` are rejected with `WardrobeCatalogNotReady`.
+
+**`RequestStylingItemOwnership`** (device asks, server answers): payload `stylingItemKey`; answer `{ isAccepted = true, isOwnedByPlayer }`. Ownership is asked for one item at a time, when the player selects it, and again after a purchase prompt closes. It is not part of the snapshot, because checking every item for every player would cost hundreds of Roblox requests per join. Rejection reasons: `UnknownStylingItem`, `TooManyRequests`.
 
 ---
 
@@ -565,6 +678,8 @@ idolgrow/
 │   │   ├── FanCountLeaderboardKeeper.luau
 │   │   ├── RobloxFanCountLeaderboardStorage.luau
 │   │   ├── PlayerCharacterDresser.luau        applies outfits to characters
+│   │   ├── MarketplaceStylingItemResolver.luau  details, bundle contents, sellable here
+│   │   ├── PlayerRequestRateLimiter.luau      per-player, per-channel intervals
 │   │   ├── LobbyDanceCoordinator.luau         Phase 2
 │   │   ├── DailyProgressTracker.luau          Phase 2
 │   │   ├── PromoCodeRedeemer.luau             Phase 2
@@ -583,10 +698,23 @@ idolgrow/
 
 - 🔴 `RewardLedger` is the only module that changes `fanCount` or `starCoinBalance`. Every grant carries a `rewardSourceKind` (`ThemedRound`, `PlaytimeMilestone`, `DailyQuest`, `PromoCode`; later `StylingCommission`, `Tournament`, `HiddenQuest`) and every spend a `purchaseKind` (`Dance`, `Cosmetic`). Both are logged.
 - 🔴 `starCoinBalance` can never go below 0. A spend that would do so is refused.
+- 🔴 **A reward and its record are one change.** Every grant or spend is a single in-memory change that does three things together, with nothing able to run in between: checks eligibility against the current save, changes the balance or fan count, and writes the record that makes the operation non-repeatable. A save therefore can never contain one without the others, and a crash at any moment leaves either all of it or none of it.
+
+  | Operation | Record written in the same change |
+  |---|---|
+  | Playtime milestone claim | The milestone added to `claimedPlaytimeMilestoneMinutes` |
+  | Daily quest claim | The quest added to `claimedDailyQuestIds` |
+  | Promo code redemption | The code added to `redeemedPromoCodeIds` |
+  | Dance or cosmetic purchase | The item added to `ownedDanceIds` or `ownedCosmeticIds` |
+  | Round reward | `totalRoundsCompletedCount`, `bestStarCountByThemeId` and daily quest progress |
+
+  If the change cannot be applied, nothing changes and the request is rejected. The ledger's grant and spend operations take the caller's eligibility check and record as part of the same change; no caller grants first and records afterwards.
 - 🔴 `RobloxPlayerSaveDataStorage` is the only file that touches `PlayerSaveData_v1`; `RobloxFanCountLeaderboardStorage` is the only file that touches `FanCountLeaderboard_v1`.
 - 🔴 The rule parts of the clock, referee, ledger, archivist, leaderboard keeper, daily tracker and promo redeemer call no Roblox-specific interface directly. Storage, the current time and the random generator are passed in, so tests can substitute fakes.
 - 🔴 `OutfitValidator`, `OutfitScoreCalculator` and the tag vocabulary call no Roblox-specific interface.
 - 🔴 `ThemedRoundReferee` never accepts a score, star count or reward amount from a device.
+- 🔴 Every event `PlayerSaveDataKeeper` raises gives **each listener its own isolated snapshot**: either a separate deep copy per listener or one deeply frozen table. Nothing a listener does to what it receives can change what another listener, or the keeper, sees.
+- 🔴 `MarketplaceStylingItemResolver` is the only module that asks Roblox about Marketplace items and bundles. Everything else reads its cached answers.
 
 ### 3.4 Saves: cross-server protection and save rules
 
@@ -629,10 +757,13 @@ The final save (player leaving, server shutting down) clears `gameServerSessionL
 
 | Moment | Note |
 |---|---|
-| After any ledger grant or spend, and after any claim, redemption, equip or lobby-outfit change | Queued immediately |
+| After any ledger grant or spend, and after any claim or redemption | A save is requested at once |
+| After an appearance change (equip, lobby outfit) | No save is requested. The change is written by the next save of any kind |
 | Every 120 seconds | Written even with no changes, to refresh the lock |
 | Player leaves | Final save, hands the lock back |
 | Server shuts down | Final save for everyone in parallel. Roblox allows 30 seconds |
+
+🔴 **Spacing.** For one player, a save starts no sooner than `MINIMUM_SECONDS_BETWEEN_SAVE_STARTS = 10` seconds after that player's previous save started. A save requested earlier waits until then and writes whatever is in memory at that moment. Retries after a failure (2, 4, 8 seconds) and the final save are exempt. This caps the steady rate at 6 saves per player per minute regardless of what devices send.
 
 #### Concurrency and failure
 
@@ -654,22 +785,41 @@ The leaderboard keeper holds `lastLeaderboardSyncedFanCount` in memory per onlin
 
 - 🔴 A leaderboard fault never blocks scoring, rewards or saving.
 - 🔴 The keeper takes `fanCount` only from the "save succeeded" event, never from the latest in-memory value.
+- 🔴 Each leaderboard write is one atomic operation that stores `max(value already stored, fanCount being written)`. Fans never decrease, so the larger value is always the newer one. A late write from an old server, completing after a newer server's write, therefore cannot move the leaderboard backwards.
 
 ### 3.6 Data store budgets (official limits, §8)
 
 Default limits per server per minute: standard read and standard write `60 + players × 40` each; ordered write `30 + players × 5`; ordered list read `5 + players × 2`. The whole game also has a limit that scales with concurrent players: standard writes `300 + concurrent players × 20` per minute. An atomic read-modify-write uses one read and one write.
 
-Estimate for a full 12-player server, per minute: timed saves 6; round rewards at most about 3 (12 saves per 280-second round); purchases, claims and equips perhaps 6 more. About 15 save operations against a limit of 540. Ordered writes about 3 against 90. One ordered list read against 29.
+For a full 12-player server, per minute:
+
+| | Expected | Hard ceiling from §3.4 spacing | Limit |
+|---|---|---|---|
+| Save operations | About 12: timed saves 6, round rewards about 3, purchases and claims a few | 72 (6 per player) | 540 |
+| Leaderboard writes | About 3 | 72 (at most one per save) | 90 |
+| Leaderboard list reads | 1 | 1 | 29 |
+
+The ceiling holds whatever devices send, because appearance changes do not request saves, requests are rate-limited (§2.13) and save starts are spaced. Without the spacing, 12 players each changing something once a second would ask for 720 saves a minute against a limit of 540.
 
 ### 3.7 Dressing characters
 
 - All avatars are R15.
 - The server dresses a character by replacing its clothing, accessories, hair and makeup with the outfit; body shape and skin tone stay as the player's own.
-- The wardrobe preview on the device must feel immediate. Whether it is applied locally or through the server is decided by the Phase 1 trial in §8.
+- A styling item of kind `Bundle` is put on by applying every wearable asset the bundle contains, as resolved by `MarketplaceStylingItemResolver`. For shoes that is the left and the right shoe.
+- 🔴 The appearance is built by starting from the character's currently applied appearance and replacing only clothing, accessories, hair and makeup. This is what keeps body parts, body colours and scale unchanged; the trial confirmed it after every step.
+- 🔴 **Layering order.** Layered clothing gets an explicit order so that pieces do not swallow each other: shoes below dresses and bottoms, inner tops below jackets. The trial showed fur boots wrapping around a dress hem when ordered above it. Rigid accessories (hair, glasses, necklaces) must not be given an order at all: doing so makes the whole appearance fail to apply, with only a console warning.
+- Makeup is applied as part of the same appearance, as a makeup entry carrying its asset id and type (face, lip or eye). It needs an R15 character whose head is a mesh head. ⚠️ Whether every player's avatar has one is not established (§8); on an avatar where it cannot show, the item still counts for scoring.
+
+**Wardrobe preview.** Measured in Studio: an appearance applied by the server takes about 0.3–0.6 seconds to show on the device, and a device is not allowed to apply an appearance to its player's real character at all. So:
+
+- 🔴 The wardrobe shows a **device-only copy** of the player's character, dressed on the device from the catalog snapshot (§2.14). The trial measured about 0.25 seconds per change this way. A short "updating" indication covers the wait.
+- The player's real character is not touched during `Styling`. The server dresses it at the start of `Showcase` (§2.4) and for the lobby outfit (§2.7).
+- The device preview and the server use the same rules above, so what the player previews is what the server later applies.
+- A faster path exists (the server prepares each accessory once; the device attaches a copy in about 2 milliseconds) but was tried only with rigid hair, not with layered clothing. It is not used in Phases 1–2.
 
 ### 3.8 Dances
 
-- Phases 1–2 ship with Roblox's own dance animations as starter and placeholder dances.
+- Phases 1–2 ship with Roblox's own dance animations as starter and placeholder dances: animation ids `507771019`, `507776043` and `507777268`. They are created by Roblox and come from the default character animation script; in the trial each looped for 15 seconds with no visible jump at the loop point. They are short, 1–2 second loops, and look basic.
 - Owner-made dances are added to `DanceCatalog` as they are produced; no code change is needed to add one.
 - ⛔ No dance is named after a song, artist or idol.
 
@@ -717,10 +867,10 @@ Estimate for a full 12-player server, per minute: timed saves 6; round rewards a
 
 **The numbers move; the dashboard is the source of truth.**
 
-- Entry threshold: 250 in the official documentation. An official announcement shows it was lowered from 500 on 2026-08-19.
-- A search result quotes a forum reply saying it will drop to 100 later in 2026. The original was not read and no date was found. 🔴 Do not plan on 100.
+- Entry threshold: **100** unique plays by highly engaged, age-checked players within 60 days, in the official documentation as last updated 2026-11-19 20:53 UTC. The same page said 250 earlier that day, and an official announcement shows 500 → 250 on 2026-08-19.
 - Maintenance threshold: 25 highly engaged players to stay eligible.
-- Actual figures: the Audience Reach page in Creator Hub.
+- Actual figures and the game's own progress: Creator Hub → the game → Publish Settings → Manage Audience.
+- 🔴 The number has changed twice in three months. Check it again before any launch decision.
 
 **Fees (Robux, once per game).**
 
@@ -754,16 +904,20 @@ With data-store access switched on, Studio reads and writes the game's **real** 
 
 | Type | Where | Run by | Covers |
 |---|---|---|---|
-| Unit: item-pool tool (Lune) | `tests/` | AI, after each change | Rejects unknown tags, duplicate ids, rows without a style tag; generated module matches the CSV |
-| Unit: outfit validity (Lune) | `tests/` | AI | Each of the five rules in §1.5, passing and failing |
+| Unit: item-pool tool (Lune) | `tests/` | AI, after each change | Rejects unknown tags, duplicate keys, rows without a style tag, a `shoes` row that is not a `Bundle`, a non-shoes row that is not an `Asset`; derives `stylingItemKey`; generated module matches the CSV |
+| Unit: outfit validity (Lune) | `tests/` | AI | Each of the five rules in §1.5, passing and failing; a shoes bundle counts as one item; an outfit containing a hidden item is invalid |
 | Unit: scoring (Lune) | `tests/` | AI | The §1.6 worked example gives exactly 83 and 4 stars; each component at its minimum and maximum; a dress filling two slots; neutral colours ignored; empty outfit gets nothing; star boundaries at 39/40, 59/60, 74/75, 89/90 |
 | Unit: round clock (Lune, fake clock) | `tests/` | AI | Phase order and durations; a new `roundId` each round; no theme repeated within 5 rounds; the clock runs with no participants |
-| Unit: referee (Lune) | `tests/` | AI | A draft is kept only under the four conditions of §2.3; a late draft does not change the scored outfit; joining is refused when less than 60 seconds remain; a participant who leaves gets nothing |
-| Unit: ledger (Lune) | `tests/` | AI | Grants and spends change the right number; a spend that would go negative is refused; buying an owned item is refused and costs nothing |
+| Unit: referee (Lune, fake clock) | `tests/` | AI | Each of the four checks in §2.3; two drafts arriving 0.1 seconds apart are both taken into account and the later one is scored; a waiting draft is processed at the end of `Styling` before scoring; a stale or duplicate sequence number is not processed twice; every processed draft is acknowledged; a late draft does not change the scored outfit; joining is refused when less than 60 seconds remain; a participant who leaves gets nothing |
+| Unit: ledger (Lune, fake storage) | `tests/` | AI | For each operation in the §3.3 table: after a save failure or a crash injected at every possible point, the reloaded save holds either the reward together with its record or neither, and the operation cannot then be repeated for a second reward. Grants and spends change the right number; a spend that would go negative is refused; buying an owned item is refused and costs nothing |
 | Unit: daily content (Lune, fake clock) | `tests/` | AI | Milestones cannot be claimed early or twice; progress resets when `dailyDateKey` changes; the same three quests for every player on a given date; quest progress counts only qualifying rounds |
 | Unit: promo codes (Lune, fake clock) | `tests/` | AI | Case-insensitive match; before and after the validity window; second redemption refused; attempts faster than 2 seconds refused |
-| Unit: archivist (Lune, fake storage and clock) | `tests/` | AI | A held lock makes loading wait and succeed after release; an expired lock is taken over; a write is abandoned once the lock is lost; a failed save stays pending and retries; a change made during a save is not lost; overlapping save requests do not run in parallel; a failed load never produces a starting save |
-| Unit: leaderboard keeper (Lune, fake storage) | `tests/` | AI | No sync when the save failed; catch-up sync after loading; a failed sync does not affect rewards |
+| Unit: archivist (Lune, fake storage and clock) | `tests/` | AI | A held lock makes loading wait and succeed after release; an expired lock is taken over; a write is abandoned once the lock is lost; a failed save stays pending and retries; a change made during a save is not lost; overlapping save requests do not run in parallel; a failed load never produces a starting save; a listener that modifies the snapshot it received does not affect the next listener or the keeper; an appearance change does not request a save; two save requests within 10 seconds produce save starts at least 10 seconds apart; retries and the final save ignore the spacing |
+| Unit: leaderboard keeper (Lune, fake storage) | `tests/` | AI | No sync when the save failed; catch-up sync after loading; a failed sync does not affect rewards; two writes completing in the opposite order to which they were issued leave the larger value stored |
+| Unit: wardrobe catalog and stored outfits (Lune, fake Roblox answers) | `tests/` | AI | The snapshot contains every available item and no hidden one; requests are rejected until the catalog is ready; a stored key that left the pool is removed from the save at load; a stored key that is only hidden this session is skipped when dressing and kept in the save; the unavailable keys are reported |
+| Unit: appearance on spawn (Lune) | `tests/` | AI | The decision of what to apply for each player state in the §2.4 respawn table |
+| Unit: request rate limiter (Lune, fake clock) | `tests/` | AI | A request inside the interval is refused and changes nothing; one at exactly the interval is accepted; limits are per player and per channel; a no-op request causes no revision bump |
+| Unit: Marketplace item resolver rules (Lune, fake Roblox answers) | `tests/` | AI | An item is hidden when details fail, when not on sale, when not sellable in this game, when a bundle's contents fail; a bundle resolves to its asset list |
 | Manual, test game, Studio single player | — | Owner | A full round; the results screen matches §1.6; balances survive leaving and immediately rejoining; buying and equipping a dance; claiming a milestone; redeeming a code |
 | Manual, test game, Studio multi-player simulation | — | Owner | Two simulated players see each other's outfits and dances in the showcase; both appear on the leaderboard; dance sync works |
 | Manual, real phone | — | Owner | The wardrobe is usable by touch; a round is completable on a phone |
@@ -791,6 +945,8 @@ Target: at least 80 unit tests across Phases 1–2.
 | 1C | In the test game, a full round runs and the results screen matches §1.6 for the outfit worn | ⬜ |
 | 1D | Rounds keep cycling for 30 minutes with no participants and no errors | ⬜ |
 | 1E | After leaving and immediately rejoining, Star Coins, fans and round count are unchanged | ⬜ |
+| 1G | A participant who resets their character during `Showcase` is back on the stage in the scored outfit, dancing, within 3 seconds; the score is unchanged | ⬜ |
+| 1H | The wardrobe on the device lists exactly the items the server reports as available; an item made unavailable in the test pool does not appear | ⬜ |
 | 1F | Two simulated players each finish a round; within 2 minutes of their saves succeeding both appear on the leaderboard with the same fan counts as their saves | ⬜ |
 
 **Phase 2 — publishable**
@@ -802,7 +958,7 @@ Target: at least 80 unit tests across Phases 1–2.
 | 2C | A dance can be bought with Star Coins, equipped, and seen in the showcase | ⬜ |
 | 2D | Tapping a dancing player syncs the dance without owning it | ⬜ |
 | 2E | Playtime milestones, daily quests and a promo code can each be claimed once and not twice | ⬜ |
-| 2F | Buying a Marketplace item from the wardrobe opens Roblox's purchase prompt | ⬜ |
+| 2F | In the published game, with Allow Third Party Sales on, a real purchase of one low-priced `Asset` item and one shoes `Bundle` completes: each item arrives in the buying account's inventory, and each sale appears in the game owner's sales records. Opening the prompt alone does not pass this gate | ⬜ |
 | 2G | A round is completable by touch on a real phone | ⬜ |
 | 2H | Published to the "16+ and Trusted Friends" tier | ⬜ |
 
@@ -845,12 +1001,18 @@ Season pass, theme collection book, photo spot, player voting, team competition.
 | Fact | Source | Status |
 |---|---|---|
 | The game owner receives a 40% commission when a player buys a Marketplace avatar item inside the game | Official docs "Marketplace fees and commissions" | ✅ Read |
-| A game may dress characters in Marketplace items; when an avatar or outfit is saved, the user does not receive items they do not own | Official docs "Avatar Editor Service" and "Character appearance" | ✅ Read. Trying on arbitrary un-owned items in-game is consistent with this but is confirmed only by the Phase 1 trial |
+| A game's server can dress a player in Marketplace items the account does not own — rigid and layered, including items by other creators — with body and skin unchanged | Official docs "Avatar Editor Service", "Character appearance"; **trial 1 in Studio**: hair, jacket, dress, necklace, glasses, each reported not owned and each visibly worn | ✅ Run. In an unpublished place; re-check in the published game |
 | Playable gambling is prohibited; "interactive slot machines" are named; unplayable gambling imagery restricts a game to 13+ | Official docs "Content ratings" | ✅ Read |
 | Free random rewards need no odds disclosure; paid ones need exact odds and regional restriction | Official docs "Paid random items policy guidelines" | ✅ Read |
-| The Marketplace has a makeup category (eyes, face, lips, eyelashes, eyebrows), launched March 2026 | Roblox newsroom and forum announcement, via search summary | 🟡 Launch confirmed. Whether Marketplace makeup can be applied to a character from game code, and whether the 40% commission applies, is not confirmed |
-| Publishing tiers, the 250 threshold, the 25 maintenance threshold, fees | Official docs "Roblox Kids and Select", "Publish games and places"; official forum announcement of 2026-08-19 | ✅ Read. Publishing-fee refund terms differ between two official pages |
-| Threshold dropping to 100 | A forum reply quoted in a search summary | 🟡 Original not read; no date |
+| Marketplace makeup can be applied from game code, as assets of type face, lip or eye makeup. No makeup-only bundles were found; the "makeup" bundles in catalog search are whole replacement heads and are excluded | Official reference `MakeupDescription`; **trial 1**: a lip makeup item visibly changed the lips | ✅ Run. Needs an R15 mesh head; whether every avatar has one is not established |
+| Shoes on a mannequin must be set as a bundle "to include the right and left shoe" | Official docs "Homestore" | ✅ Read |
+| Selling another creator's item in a game needs Allow Third Party Sales on, and the item's sale location must allow the game; otherwise users "can only see the added items, but can't purchase them" | Official docs "Homestore" | ✅ Read |
+| For assets, product info reports `CanBeSoldInThisGame` and a sale-location type. For **bundles it reports neither**, nor price or on-sale status. Avatar item details report sale location and purchasability for both kinds | **Trial 1**. The enum page `ProductLocationRestriction` lists values 0–2 while the engine returned 5 ("shop and all experiences"); that page is out of date | ✅ Run. Checked against an unpublished place; re-check in the published game |
+| A shoes bundle resolves to a left shoe, a right shoe and a non-wearable saved-outfit entry; applying the two shoes shows both. Bundles have their own purchase prompt and ownership check | Official references `AssetService`, `MarketplaceService`; **trial 1** | ✅ Run. Purchase prompt not exercised |
+| An ordered data store supports an atomic read-modify-write (`UpdateAsync`) | Official docs "Data store error codes and limits" lists it for ordered data stores | ✅ Read. Not run |
+| Only shoes need bundles | **Trial 1 and 4**: makeup items are single assets | ✅ Run, for the items tried |
+| Publishing tiers, the 25 maintenance threshold, fees | Official docs "Roblox Kids and Select", "Publish games and places"; official forum announcement of 2026-08-19 | ✅ Read. Publishing-fee refund terms differ between two official pages |
+| The entry threshold is 100 | Official docs "Roblox Kids and Select", page stamped 2026-11-19 20:53 UTC. The copy read at 03:02 UTC the same day said 250 | ✅ Read, twice; the two copies were compared |
 | Leaving one server and joining another can read a stale save; Roblox recommends session locking | Official docs "Player data and purchasing systems" | ✅ Read |
 | A server has 30 seconds to save at shutdown | Same | ✅ Read |
 | Studio accesses the game's real data stores; use a separate test version | Official docs "Data stores" | ✅ Read |
@@ -858,20 +1020,24 @@ Season pass, theme collection book, photo spot, player voting, team competition.
 | The "Apple" dance lawsuit against Roblox, filed April 2025, settled September 2025 | Press reports (PC Gamer, Tubefilter) | ✅ Read as reported |
 | The proposed motion-capture tool (RGB MoCap) is a native Windows application needing an NVIDIA GPU; it exports FBX and BVH but has no Roblox skeleton target | Its own README | ✅ Read |
 | An open-source model it builds on (GVHMR) has a Colab demo, but outputs body parameters that need converting to an animation file | Search summary | 🟡 No verified end-to-end route found |
-| An animation plays only in games owned by its owner, or if Roblox owns it | Several forum posts by users | 🟡 No official text read |
-| Which Roblox-owned dance animations exist and loop cleanly | Not checked | ⬜ Check in Studio during Phase 1 |
-| Wardrobe preview can be applied instantly on the device | Not checked | ⬜ Phase 1 trial |
-| Lune can run tests that involve waiting (fake storage delays) | Assumed | ⬜ Check when scaffolding |
-| Rojo 7.7.1 handles `.luau`, `.server.luau`, `.client.luau` file names | Assumed | ⬜ Check when scaffolding |
+| Rules for playing an animation the game does not own | Official docs do not state the rule ("Asset privacy", "Animation editor", "Use animations" were read). **Trial 3**: Roblox-owned animations play in a place owned by nobody. An animation owned by a third party was not tried | 🟡 Roblox-owned: run. Third-party: not established; ⛔ still not used |
+| Roblox's default dances `507771019`, `507776043`, `507777268` are created by Roblox and loop cleanly | **Trial 3**: creator read from product info; each played 15 seconds with pose changes at the loop point within normal frame-to-frame range. Ids come from the engine's default animation script, not from a documentation page | ✅ Run |
+| Wardrobe change timing | **Trial 2**, in Studio on a local connection: server-applied 285–600 ms; a device may not apply an appearance to its own real character; on a device-only copy 229–307 ms; attaching a prepared accessory about 2 ms (rigid hair only) | ✅ Run. Real devices and real networks will be slower; not measured |
+| Tests never wait: time and delayed work are injected and faked | Scaffolding slice; 41 tests | ✅ Resolved by design |
+| Rojo 7.7.1 maps `.luau`, `.server.luau`, `.client.luau` to module, server and client scripts | Scaffolding slice: built and inspected | ✅ Run |
+| String requires `./Sibling` and `../Folder/Module` resolve between modules in Roblox, in edit mode, on the server and on the client | **Trial 5** | ✅ Run. Folder-as-module (`init.luau`) not tried and not used |
+| The 40% commission covers bundles and makeup | Official "Marketplace fees and commissions" lists makeup and shoes among sellable items and gives 40% to the game owner for in-game purchases, without naming bundles or makeup in the commission rule itself | 🟡 Likely; settled only by gate 2F |
 | Tools installed on this machine and their versions | Version commands run on 2026-11-19 | ✅ Measured |
 
-**Phase 1 starts with three trials**, because the design depends on them:
+**The Phase 1 trials were run on 2026-11-19** in an unsaved Studio place, through the Studio MCP connection. Nothing was purchased, saved, published or uploaded. Raw output and 16 screen captures are kept outside the repository. Results are in the table above. The trials were:
 
-1. Dress a character in five Marketplace items the test account does not own, and in one makeup item.
+1. Dress a character in five Marketplace asset items the test account does not own, in one shoes bundle (both shoes must appear), and in one makeup item. For each, read whether Roblox reports it as sellable in this game.
 2. Measure how quickly a wardrobe change appears on the device.
 3. Play two Roblox-owned dance animations on a character in a loop.
 
-If trial 1 fails for makeup, the `makeup` scoring slot is removed and scoring uses five slots. If it fails for clothing, this design does not work and must be revisited.
+Outcome: clothing, shoes and makeup all work, so the six scoring slots stay and the design stands.
+
+Still to be established, all of them only possible in the published game: that items report as sellable there, that a purchase completes, and that the commission arrives (gate 2F); timing on real devices (gate 2G).
 
 ---
 
@@ -883,8 +1049,54 @@ If trial 1 fails for makeup, the `makeup` scoring slot is removed and scoring us
 | 2 | Complete the account age check | Needs the owner's ID or face | ⬜ |
 | 3 | Install the Rojo plugin in Roblox Studio | Done inside the owner's Studio | ⬜ |
 | 4 | Create two Roblox games, test and release; switch on Studio data-store access only for the test one | Needs the owner's login | ⬜ |
-| 5 | Confirm decisions 5 and 11–18 in §0.3 | Product choices | ⬜ |
-| 6 | Pick and tag Marketplace items: 30 for Phase 1, 200 for Phase 2 | Taste and judgement | ⬜ |
+| 5 | Decide the publishing tier (decision 18 in §0.3). The other decisions were confirmed with v1.0 | Product choice | ⬜ |
+| 6 | Pick and tag Marketplace items: 30 for Phase 1, 200 for Phase 2. Only items on sale and sellable in all experiences; shoes as bundles (§1.2) | Taste and judgement | ⬜ |
+| 6a | Switch on Allow Third Party Sales in both the test game and the release game | Needs the owner's login | ⬜ |
 | 7 | Review the theme list (about 30); AI drafts it | Taste | ⬜ |
 | 8 | Run the dance-capture trial: film 10 seconds, extract motion, convert in Blender, import into Roblox; AI writes the step-by-step guide | Needs the owner's body, camera and GPU access | ⬜ |
 | 9 | Produce dances once the trial works | Same | ⬜ |
+
+---
+
+## 10. Revision record
+
+### v1.1
+
+Source: an external audit of spec v1.0 and of the code written so far, passed on by the owner on 2026-11-19. The audit changed no files.
+
+| Audit finding | Verdict | How it was checked | Disposition | Where |
+|---|---|---|---|---|
+| P1 — the item model cannot represent a pair of shoes | Confirmed | Official "Homestore" page says shoes must be a bundle containing right and left; `OutfitValidator.luau` allows one `shoes` item and the model had only a single asset id | Adopted: assets and bundles distinguished; one bundle is one styling item; outfits become lists of `stylingItemKey` | §1.2, §1.5, §1.6, §2.3, §2.7, §2.12, §3.7 |
+| P2 — save-event listeners share one mutable snapshot | Confirmed | Read `PlayerSaveDataKeeper.luau`: the caller makes one deep copy per event and `fireEvent` hands that same table to every listener. Not re-run here | Adopted as a hard constraint with a test | §3.3, §6.2 |
+| P2 — "on sale" does not mean "buyable in this game" | Confirmed | Official "Homestore" page and `MarketplaceService` reference | Adopted: selection rule, run-time hiding, third-party-sales setting, gate 2F requires a completed purchase | §1.2, §2.12, §6.3, §9 |
+| P2 — a late leaderboard write can overwrite a newer one | Confirmed by reasoning | Both writes carry values that were genuinely saved, so the v1.0 rule did not prevent it | Adopted: atomic keep-the-larger write, with an out-of-order test | §1.11, §3.5, §6.2 |
+| P2 — saving on every equip change with no server rate limit | Confirmed | 12 players × 60 changes a minute = 720 against a limit of 60 + 12 × 40 = 540 | Adopted: appearance changes do not request saves, save starts spaced 10 seconds per player, per-channel rate limits, no-op requests ignored | §2.13, §3.4, §3.6, §6.2 |
+
+**State of the code at the time of the v1.1 revision.** Scaffolding was accepted (41 tests). The scoring/item-pool slice and the save/leaderboard slice were both stopped part-way: their modules have no tests yet, the format check currently fails on them, and they implement v1.0. They must be finished against v1.1.
+
+### v1.2
+
+Source: a second external audit, of spec v1.1, passed on by the owner on 2026-11-19. The audit changed no files.
+
+| Audit finding | Verdict | How it was checked | Disposition | Where |
+|---|---|---|---|---|
+| P1 — a reward and its claimed/redeemed/owned record are not required to be written together | Confirmed as a gap in the spec | v1.1 required a save after grants and claims but nowhere required the balance change and the record to be one change. The existing `PlayerSaveDataKeeper` already applies a change through a single non-yielding function, so the mechanism exists; the requirement did not. The audit's failure-injection reproduction was not re-run here | Adopted: hard constraint with a per-operation table and crash-recovery tests | §3.3, §6.2 |
+| P2 — a correctly sent last draft can be silently dropped | Confirmed by reasoning | Device and server both used 0.5 seconds; network jitter can make two sends 0.5 seconds apart arrive closer together | Adopted: sequence number, acknowledgement, resend, a waiting place on the server instead of refusal, a defined cut-off | §2.3, §2.13, §6.2 |
+| P2 — no contract for sending the server-filtered wardrobe to the device | Confirmed | §2 of v1.1 had no channel for available items, prices or bundle contents | Adopted: catalog snapshot, readiness, change notice, on-demand ownership | §2.14, §2.2, §2.7, §2.12, gate 1H |
+| P2 — no rule for a stored outfit whose items became unavailable | Confirmed | §1.5 made such an outfit invalid while §2.4 required restoring it | Adopted: wear the available part; remove a key from the save only when the item left the pool | §1.5, §2.4, §2.6, §6.2 |
+| P2 — respawn during the showcase is undefined | Confirmed | §2.4 dressed and placed characters only at the start of `Showcase` | Adopted: state-based re-application on every spawn | §2.4, §6.2, gate 1G |
+| P2 — the publishing threshold is now 100 | Confirmed | The official page was downloaded again and compared with the copy from earlier the same day: 250 at 03:02 UTC, 100 at 20:53 UTC | Adopted: 100 everywhere, with the history and a reminder to re-check | §0.2, §5.3, §8 |
+
+**New channels since the scaffolding was written.** `RoundOutfitDraftAcknowledged`, `RequestWardrobeCatalogSnapshot`, `WardrobeCatalogChanged`, `RequestStylingItemOwnership`. `src/shared/RemoteNames.luau` and its test list 17 channels and must be extended to 21.
+
+### v1.3
+
+Source: the Phase 1 trials, run in Roblox Studio by an engineer agent on 2026-11-19 and checked by the reviewer against the raw output and screen captures (baseline avatar, shoes, dress with shoes).
+
+| Trial | Verdict | What changed in this document |
+|---|---|---|
+| 1 — wearing un-owned assets, a shoes bundle, makeup | Works | §8 facts; §1.2 sellability read from item details and asset types recorded; §3.7 dressing rules |
+| 2 — how fast a change shows | Partly: no path is instant | §3.7 preview is a device-only copy; §2.14 snapshot carries asset types |
+| 3 — Roblox-owned dances | Works | §3.8 ids filled in; `DanceCatalog` must use them |
+| 4 — documentation questions | Makeup from code: yes. Animation ownership: docs silent. Commission on bundles and makeup: likely, unproven | §8 |
+| 5 — string requires in Roblox | Works | §8 |
