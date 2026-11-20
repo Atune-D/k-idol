@@ -1,13 +1,13 @@
 # Active Tasks（唯一优先级视图）
 
 > 规则见 [README](README.md)。区内顺序即优先级；细节看"详情"列的链接，本文件不写细节。
-> 最后整理：YYYY-MM-DD
+> 最后整理：2026-11-19
 
 ## Now（当前主攻，≤3 行）
 
 | ID | Initiative / Task | 状态 | 负责人 | 依赖 | 详情 |
 |---|---|---|---|---|---|
-| T-1 | 示例：把第一件重复劳动固化成 skill | In Progress | 双方 | — | — |
+| T-1 | 换装核心玩法第一、二阶段（主题回合、评分、存档、大厅、舞蹈商店）：五批代码已完成两批 | In Progress | 双方 | 负责人挑选并标注商城物品；建测试用和正式用两个 Roblox 游戏 | [交接说明](../plans/1119-dress-up-core/dress-up-core-handoff.md) · [开发文档](../plans/1119-dress-up-core/dress-up-core-development-spec.md) |
 
 ## Next
 

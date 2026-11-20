@@ -6,7 +6,7 @@
   - v1.2 (2026-11-19) — takes in a second external audit: six findings, all confirmed (§10). Changes: a reward and the record that makes it non-repeatable are one indivisible change; outfit drafts carry a sequence number, are acknowledged and are never dropped for arriving early; the server publishes the wardrobe catalog it validates against; stored outfits survive unavailable items; a character that respawns is put back into the state its player is in; the publishing threshold is now 100.
   - v1.1 (2026-11-19) — takes in an external audit of v1.0 and of the first code: five findings, all confirmed (§10). Changes: styling items can be Marketplace bundles, so a pair of shoes is one item; outfits are lists of styling item keys; items that cannot be sold in this game are hidden; purchase acceptance now requires a completed purchase; the leaderboard write can never lower a value; save starts are spaced per player and requests are rate-limited; save events hand each listener an isolated snapshot.
   - v1.0 (2026-11-19) — first draft of the new direction. Confirmed by the owner the same day.
-- **Status**: implementation paused part-way. All existing code predates v1.1 and v1.2 and must be brought in line with this version.
+- **Status** (2026-11-19, after commit `0e7d0d5`): scaffolding, the tags-and-scoring slice and the save-and-leaderboard slice are written, verified and pushed (266 unit tests). Round logic, server wiring, the client and all of Phase 2 are not written. Where things stand and how to continue: [`dress-up-core-handoff.md`](./dress-up-core-handoff.md).
 - **Supersedes**: [`../1119-rhythm-mvp/rhythm-mvp-development-spec.md`](../1119-rhythm-mvp/rhythm-mvp-development-spec.md) (the rhythm-game direction, dropped on 2026-11-19). Its save-data, leaderboard and publishing rules are carried into this document; its rhythm gameplay is not.
 - **Readers**: the engineering session that implements this; §0 is written for a non-engineer.
 - **Division of labour**: this is the only document for this initiative. There is no separate plan document yet; the reasons behind decisions are recorded in §0.3. 🔴 **If another document conflicts with this one, this one wins.**
@@ -1072,7 +1072,7 @@ Source: an external audit of spec v1.0 and of the code written so far, passed on
 | P2 — a late leaderboard write can overwrite a newer one | Confirmed by reasoning | Both writes carry values that were genuinely saved, so the v1.0 rule did not prevent it | Adopted: atomic keep-the-larger write, with an out-of-order test | §1.11, §3.5, §6.2 |
 | P2 — saving on every equip change with no server rate limit | Confirmed | 12 players × 60 changes a minute = 720 against a limit of 60 + 12 × 40 = 540 | Adopted: appearance changes do not request saves, save starts spaced 10 seconds per player, per-channel rate limits, no-op requests ignored | §2.13, §3.4, §3.6, §6.2 |
 
-**State of the code at the time of the v1.1 revision.** Scaffolding was accepted (41 tests). The scoring/item-pool slice and the save/leaderboard slice were both stopped part-way: their modules have no tests yet, the format check currently fails on them, and they implement v1.0. They must be finished against v1.1.
+**State of the code at the time of the v1.1 revision** (superseded — see the Status line at the top and the handoff note). Scaffolding was accepted (41 tests). The scoring/item-pool slice and the save/leaderboard slice were both stopped part-way at that time. They were later finished against v1.2 and v1.3 and accepted.
 
 ### v1.2
 
@@ -1087,7 +1087,7 @@ Source: a second external audit, of spec v1.1, passed on by the owner on 2026-11
 | P2 — respawn during the showcase is undefined | Confirmed | §2.4 dressed and placed characters only at the start of `Showcase` | Adopted: state-based re-application on every spawn | §2.4, §6.2, gate 1G |
 | P2 — the publishing threshold is now 100 | Confirmed | The official page was downloaded again and compared with the copy from earlier the same day: 250 at 03:02 UTC, 100 at 20:53 UTC | Adopted: 100 everywhere, with the history and a reminder to re-check | §0.2, §5.3, §8 |
 
-**New channels since the scaffolding was written.** `RoundOutfitDraftAcknowledged`, `RequestWardrobeCatalogSnapshot`, `WardrobeCatalogChanged`, `RequestStylingItemOwnership`. `src/shared/RemoteNames.luau` and its test list 17 channels and must be extended to 21.
+**New channels since the scaffolding was written.** `RoundOutfitDraftAcknowledged`, `RequestWardrobeCatalogSnapshot`, `WardrobeCatalogChanged`, `RequestStylingItemOwnership`. `src/shared/RemoteNames.luau` now lists all 21 (done in commit `0e7d0d5`).
 
 ### v1.3
 
