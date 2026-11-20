@@ -2,11 +2,12 @@
 
 > A Roblox idol dress-up game: style an outfit to a theme, perform a dance on stage, get scored by the system, earn Star Coins and fans.
 
-- **Version**: v1.3 (2026-11-19) — records the results of the Phase 1 trials, run in Roblox Studio (§8, §10). The design holds: un-owned Marketplace items, shoe bundles and makeup can all be worn. Changes: sellability is read from item details because bundle product info lacks it; dressing rules for layering order; the wardrobe preview is a device-only copy of the character; starter dance ids filled in.
+- **Version**: v1.4 (2026-11-19) — records what the implementation decided where v1.3 was silent or wrong (§10): the project layout in Roblox (shared modules are mapped once per side), limited items are hidden, a new ownership rejection reason, lookup time limits, quick rejoins wait for the previous session, and twelve defaults awaiting the owner's decision.
+  - v1.3 (2026-11-19) — records the results of the Phase 1 trials, run in Roblox Studio (§8, §10). The design holds: un-owned Marketplace items, shoe bundles and makeup can all be worn. Changes: sellability is read from item details because bundle product info lacks it; dressing rules for layering order; the wardrobe preview is a device-only copy of the character; starter dance ids filled in.
   - v1.2 (2026-11-19) — takes in a second external audit: six findings, all confirmed (§10). Changes: a reward and the record that makes it non-repeatable are one indivisible change; outfit drafts carry a sequence number, are acknowledged and are never dropped for arriving early; the server publishes the wardrobe catalog it validates against; stored outfits survive unavailable items; a character that respawns is put back into the state its player is in; the publishing threshold is now 100.
   - v1.1 (2026-11-19) — takes in an external audit of v1.0 and of the first code: five findings, all confirmed (§10). Changes: styling items can be Marketplace bundles, so a pair of shoes is one item; outfits are lists of styling item keys; items that cannot be sold in this game are hidden; purchase acceptance now requires a completed purchase; the leaderboard write can never lower a value; save starts are spaced per player and requests are rate-limited; save events hand each listener an isolated snapshot.
   - v1.0 (2026-11-19) — first draft of the new direction. Confirmed by the owner the same day.
-- **Status** (2026-11-19, after commit `0e7d0d5`): scaffolding, the tags-and-scoring slice and the save-and-leaderboard slice are written, verified and pushed (266 unit tests). Round logic, server wiring, the client and all of Phase 2 are not written. Where things stand and how to continue: [`dress-up-core-handoff.md`](./dress-up-core-handoff.md).
+- **Status** (2026-11-20): all code planned for Phases 1 and 2 is written, covered by unit tests (2,343) and accepted: rules, server wiring, device screens, and what everyone sees of Phase 2. It runs in Roblox Studio in an unpublished place on in-memory development storage; Phase 1 was played there end to end through the device screens, Phase 2 screens were exercised there without any image of their layout. Not done or not verifiable yet: anything in a published game (real data stores, leaving and rejoining, two players, purchases, a real phone) and the owner's content (item pool, promo codes, dances) and decisions (§10 v1.4). All of it is committed and pushed to `main`. Where things stand and how to continue: [`dress-up-core-handoff.md`](./dress-up-core-handoff.md).
 - **Supersedes**: [`../1119-rhythm-mvp/rhythm-mvp-development-spec.md`](../1119-rhythm-mvp/rhythm-mvp-development-spec.md) (the rhythm-game direction, dropped on 2026-11-19). Its save-data, leaderboard and publishing rules are carried into this document; its rhythm gameplay is not.
 - **Readers**: the engineering session that implements this; §0 is written for a non-engineer.
 - **Division of labour**: this is the only document for this initiative. There is no separate plan document yet; the reasons behind decisions are recorded in §0.3. 🔴 **If another document conflicts with this one, this one wins.**
@@ -568,6 +569,8 @@ Rejection reasons: `SaveDataNotLoaded`, `WardrobeCatalogNotReady`, `OutfitInvali
 
 A synced player performs the target's dance, in time with the target, without owning it, until either of them stops. This is the free trial that sells dances.
 
+Every request in this table can also be rejected with `TooManyRequests` (§2.13) and `SaveDataNotLoaded` (§3.4).
+
 ### 2.9 Daily requests (Phase 2)
 
 | Request | Payload | Accepted when | Rejection reasons |
@@ -576,6 +579,8 @@ A synced player performs the target's dance, in time with the target, without ow
 | `RequestClaimDailyQuestReward` | `dailyQuestId` | It is one of today's quests, its progress has reached `targetCount`, and it is not yet claimed today | `NotTodaysQuest`, `QuestNotCompleted`, `AlreadyClaimed` |
 
 `playtimeSecondsToday` is counted by the server while the player is connected.
+
+Both requests can also be rejected with `TooManyRequests` (§2.13) and `SaveDataNotLoaded` (§3.4).
 
 ### 2.10 `RequestRedeemPromoCode` (Phase 2)
 
@@ -634,7 +639,7 @@ The server decides which styling items are available (§1.2). The device must sh
 
 🔴 The server validates outfits against the catalog of the version it last published. Until the catalog is ready the wardrobe shows a loading state, and `RequestJoinCurrentRound` and `SetLobbyOutfit` are rejected with `WardrobeCatalogNotReady`.
 
-**`RequestStylingItemOwnership`** (device asks, server answers): payload `stylingItemKey`; answer `{ isAccepted = true, isOwnedByPlayer }`. Ownership is asked for one item at a time, when the player selects it, and again after a purchase prompt closes. It is not part of the snapshot, because checking every item for every player would cost hundreds of Roblox requests per join. Rejection reasons: `UnknownStylingItem`, `TooManyRequests`.
+**`RequestStylingItemOwnership`** (device asks, server answers): payload `stylingItemKey`; answer `{ isAccepted = true, isOwnedByPlayer }`. Ownership is asked for one item at a time, when the player selects it, and again after a purchase prompt closes. It is not part of the snapshot, because checking every item for every player would cost hundreds of Roblox requests per join. Rejection reasons: `UnknownStylingItem`, `OwnershipCheckFailed` (the Roblox check failed or did not answer within 10 seconds; added in v1.4), `TooManyRequests`.
 
 ---
 
@@ -648,7 +653,9 @@ Installed on this machine (checked 2026-11-19): Rojo 7.7.1, Lune 0.11.1, Rokit 1
 - Pure-logic modules are tested from the command line with Lune.
 - 🔴 The interface, lobby and stage are built in code, not placed by hand in Studio, so the whole game can be rebuilt from this folder.
 
-### 3.2 Planned layout (nothing exists yet)
+### 3.2 Planned layout
+
+> Written before any code existed. Since v1.4: `src/shared` is mapped twice (`ServerScriptService.shared` and `StarterPlayer.StarterPlayerScripts.shared`) and nothing is mapped into `ReplicatedStorage`; several planned modules were split into smaller files with more specific names (for example the referee into `ThemedRoundReferee`, `RefereedThemedRound`, `RoundOutfitDraftKeeper` and others). The file list below shows the intent; `README.md` and the files' own header comments describe what exists.
 
 ```
 idolgrow/
@@ -1025,7 +1032,7 @@ Season pass, theme collection book, photo spot, player voting, team competition.
 | Wardrobe change timing | **Trial 2**, in Studio on a local connection: server-applied 285–600 ms; a device may not apply an appearance to its own real character; on a device-only copy 229–307 ms; attaching a prepared accessory about 2 ms (rigid hair only) | ✅ Run. Real devices and real networks will be slower; not measured |
 | Tests never wait: time and delayed work are injected and faked | Scaffolding slice; 41 tests | ✅ Resolved by design |
 | Rojo 7.7.1 maps `.luau`, `.server.luau`, `.client.luau` to module, server and client scripts | Scaffolding slice: built and inspected | ✅ Run |
-| String requires `./Sibling` and `../Folder/Module` resolve between modules in Roblox, in edit mode, on the server and on the client | **Trial 5** | ✅ Run. Folder-as-module (`init.luau`) not tried and not used |
+| String requires `./Sibling` and `../Folder/Module` resolve between modules in Roblox, in edit mode, on the server and on the client | **Trial 5**; corrected in v1.4 after the first full load in Studio | ✅ Run, with a limit found later: `../` starts at `script.Parent.Parent`, so a require cannot cross from `ServerScriptService` into `ReplicatedStorage`. `src/shared` is therefore mapped once under `ServerScriptService` and once under `StarterPlayerScripts`, each as `shared` (§10 v1.4). A failed require is remembered per module for a whole Edit session, so requires are checked in a playtest. Folder-as-module (`init.luau`) not tried and not used |
 | The 40% commission covers bundles and makeup | Official "Marketplace fees and commissions" lists makeup and shoes among sellable items and gives 40% to the game owner for in-game purchases, without naming bundles or makeup in the commission rule itself | 🟡 Likely; settled only by gate 2F |
 | Tools installed on this machine and their versions | Version commands run on 2026-11-19 | ✅ Measured |
 
@@ -1100,3 +1107,70 @@ Source: the Phase 1 trials, run in Roblox Studio by an engineer agent on 2026-11
 | 3 — Roblox-owned dances | Works | §3.8 ids filled in; `DanceCatalog` must use them |
 | 4 — documentation questions | Makeup from code: yes. Animation ownership: docs silent. Commission on bundles and makeup: likely, unproven | §8 |
 | 5 — string requires in Roblox | Works | §8 |
+
+### v1.4
+
+Source: the implementation of the round rules, the Phase 2 rule modules and the first Studio work, all on 2026-11-19. Each module was written by an engineer agent, reviewed independently, and accepted by the lead engineer after re-running the four project commands and deliberately breaking the logic to see the tests fail. Where v1.3 was silent, the engineer implemented the most conservative reading (never lose a player's progress, never pay twice, never trust the device) and reported it. This section records those readings so that they are part of the contract instead of living only in code comments. The referee's open questions and its required test scenarios are kept in full in [`referee-open-questions-and-test-scenarios.md`](./referee-open-questions-and-test-scenarios.md); code comments cite it as "audit question N" and "scenario N".
+
+**Corrections to v1.3**
+
+| v1.3 said | What is true | Disposition |
+|---|---|---|
+| §8: string requires `../Folder/Module` resolve between modules in Roblox | Only inside one tree. `require("../shared/X")` from `ServerScriptService.Server.Y` looks for `ServerScriptService.shared.X`; with `src/shared` mapped only to `ReplicatedStorage.Shared`, no server module that requires a shared module could load in Roblox. Reproduced in Studio | `default.project.json` now maps `src/shared` twice, as `ServerScriptService.shared` and `StarterPlayer.StarterPlayerScripts.shared`, next to `Server` and `Client`. Nothing is mapped into `ReplicatedStorage`; `ReplicatedStorage.Remotes` is created at run time. Shared modules must stay stateless. Verified in a playtest: 53 server-side modules load, and device code can require `../shared/X`. §3.2 and §8 are corrected |
+| §2.8 and §2.9 rejection lists | They omit `TooManyRequests` and `SaveDataNotLoaded`, which §2.13 and §3.4 require on every request | §2.13 and §3.4 govern; noted in §2.8 and §2.9 |
+| §1.2 "is it on sale" is one fact Roblox reports | The engine reports limited items as purchasable with a price that is not what a purchase costs (measured: listed 900, lowest resale 449,999) | An item is on sale only when it is purchasable, its price status is not off sale, and it carries no item restriction. Limited and collectible items are therefore hidden |
+| §2.14 lists two rejection reasons for `RequestStylingItemOwnership` | A Roblox ownership check can fail or never answer | New rejection reason `OwnershipCheckFailed`; never answered as "not owned" |
+
+**Owner decisions pending.** Each is implemented as the default shown and isolated so that changing it is cheap.
+
+| # | Question | Implemented default | The alternative and its cost |
+|---|---|---|---|
+| 1 | A participant leaves mid-round and reconnects while joining is still open | Accepted again, starting from an empty outfit | Refuse until the next round: locks a player out for up to about four minutes after a dropped connection |
+| 2 | A participant ends with an empty outfit | Listed in the results with zeros; no reward (§1.6); the round does not count toward `totalRoundsCompletedCount` or daily quests | Counting it lets an idle device earn quest progress every round |
+| 3 | What "new best star count for the theme" means | Strictly more stars than stored; a first rated round on a theme is a new best | Equal stars also count |
+| 4 | A participant with an empty scored outfit during `Showcase` | Stands on stage and dances in the lobby appearance | Applying §3.7 literally would strip the character |
+| 5 | Server shutdown (including a game update) before `Results` | That round pays nothing | Paying early adds a second payout moment this document does not define |
+| 6 | Limited and collectible Marketplace items | Hidden from the wardrobe | Selling them needs its own pricing rule |
+| 7 | `SetLobbyOutfit` with a different outfit while some stored keys are hidden this session | The new outfit replaces the whole stored list | Merging hidden keys back can break the slot rules |
+| 8 | Syncing a dance with a player who is themselves following someone | The follower follows the tapped player; a leader stopping ends everyone below them | Following the top leader directly |
+| 9 | Daily quest draft: on about a quarter of days one quest is completed by completing another | Left as drafted | One quest per ladder in the catalog |
+| 10 | A quest catalog change on a release day | Servers on two versions can differ in one of the day's three quests, so a player could claim a fourth reward that day | A "three already claimed" refusal needs a new §2.9 reason |
+| 11 | Daily quests have no display text field (§1.8) | The device must derive text from the kind and its numbers | Add a field in a spec revision |
+| 12 | Draft content to review | 47 cosmetics (names and prices), 12 daily quests, 30 themes; the promo code catalog ships empty, so no code works until one is defined with dates; seven development items sit in the styling item pool with tags chosen by an engineer | The seven items must be replaced before gate 2F |
+
+**Readings that are now part of the contract**
+
+| Section | Reading |
+|---|---|
+| §1.4 | The bonus kind is chosen with equal chance, then the tag uniformly among the allowed ones. A theme catalog needs more than `RECENT_THEME_EXCLUSION_COUNT` themes and every theme must leave a style tag unweighted; the clock refuses to start otherwise |
+| §1.5 | Removing keys that left the pool is an appearance change (no save requested). Until the wardrobe catalog is ready, a player is reported with nothing unavailable and nothing wearable, and is worked out again when it becomes ready. A damaged stored list is read as far as it is a plain list; the rest is kept and ignored |
+| §1.8 | The three quests of a day are chosen by ranking every quest with a generator seeded from the date key and the quest id (FNV-1a, then mulberry32), so the choice does not depend on catalog order. A qualifying round adds exactly 1; progress is capped at the target; a round with an empty scored outfit never qualifies. `EarnStarsAtLeast` counts rounds, not stars |
+| §2.1 | Each phase end is planned from the previous planned end. If a phase change runs later than the whole next phase, that phase restarts at full length and a warning is logged; a phase is never skipped. A clock that fails stops, says so, and reports itself as stopped. A stopped clock is never restarted |
+| §2.2 | Rejection order: `TooManyRequests`, `AlreadyParticipating`, `SaveDataNotLoaded`, `WardrobeCatalogNotReady`, `RoundNotJoinableNow`. Exactly 60 seconds remaining is accepted. There is no participant cap |
+| §2.3 | A legal sequence number is a whole number from 1 to 2^53−1. The waiting place is replaced only by a strictly higher number. Validity is judged when a draft is processed, against the catalog as it is then. The server keeps its own bounded copy of the submitted list. A re-sent acknowledgement goes out at most once per 0.25 s. The cut-off is one step: process every waiting draft, stop accepting, score. A kept draft is never validated again |
+| §2.5 | Ties: score, then order of joining, then user id. Each participant's grant is isolated; an entry shows what was actually applied; a participant whose save is not loaded at `Results` gets no entry. The round reward is granted at most once per player per round (an in-memory marker in the referee and one in the ledger; round ids exist on one server only) |
+| §2.6 | The message holds exactly the fields listed. If the stored-outfit availability has not caught up with the save within 1 second, the message is sent with no unavailable keys and a warning is logged |
+| §2.8 | Equipping what is already equipped is accepted and changes nothing. An id with no usable catalog entry answers "not owned", except re-equipping the id already equipped. Ids longer than 64 bytes are refused before any lookup. A purchase checks ownership before the balance |
+| §2.10 | Typed text is trimmed of surrounding whitespace and compared ignoring ASCII case. A code is active from `validFromUnixSeconds` inclusive to `validUntilUnixSeconds` exclusive. Code texts are at most 32 printable ASCII bytes; typed text over 128 bytes matches nothing. A refused attempt is not looked at |
+| §2.13 | A refused request does not extend the wait. A request arriving at exactly the interval is accepted. Leaving the server forgets a player's intervals |
+| §2.14 | "Retried up to 3 times" is one attempt plus three retries, 2, 4 and 8 seconds apart. At most 10 lookups are in flight. A lookup attempt with no answer after 15 seconds counts as failed, so an item whose lookups never answer is hidden after at most 74 seconds; an ownership check with no answer after 10 seconds answers `OwnershipCheckFailed`. The catalog version is 0 until the first pass finishes and 1 afterwards. An item can be sold in this game only when its sale location is the shop and all experiences |
+| §3.3 | Every grant and spend is one keeper change holding the eligibility check, the balance change and the record. A test scans `src/` and fails if any file other than the ledger's assigns `starCoinBalance` or `fanCount`. Phase 2 quest progress joins the round reward through a record writer given to the ledger |
+| §3.4 | A player who leaves and immediately rejoins the same server: the new load waits inside the keeper until the previous session has ended, so sessions of one player never overlap. Playtime is written into the save as a change that requests no save, about once per played minute and at claims, leaving and shutdown; a crash can lose up to about 180 seconds of counted playtime. `dailyProgress` is replaced at the UTC day change while a player is online, and a malformed one is replaced the same way |
+
+**Added while wiring the game into Studio (also v1.4)**
+
+| Section | Reading or addition |
+|---|---|
+| §1.10, §6.1 | In a place that is running in Studio and has never been published (place id, game id and place version all 0) the server uses in-memory development storage and logs a loud warning that nothing is saved. Every other combination of facts uses the real data stores |
+| §2 | Requests travel as request-with-answer instances and `SetRoundOutfitDraft` and all server-sent channels as events; `RemoteNames` records the kind of every channel. A request whose server module raises is answered `{ isAccepted = false, rejectionReason = "RequestFailedOnServer" }` so that a device always gets an answer |
+| §2.4, gate 1G | A participant who dies on stage is respawned after 0.25 seconds (the engine's default respawn time cannot meet 3 seconds). After `Showcase` a character is moved to the floor in front of its stage place |
+| §2.8 | The server plays lobby dances on characters; a follower's dance is started at the position in the loop the leader has reached, and is not re-aligned afterwards. No channel tells devices who is dancing in the lobby: a device reads the animations other characters are playing. There is no request to take a cosmetic off, only to equip another |
+| §2.12 | The Buy action cannot open a purchase prompt while running in Studio (two independent checks), and the function that opens it has never been executed. Whether a device script may open these prompts for every sale location must be checked in the published test game |
+| §3.7 | Layering order used: shoes 1, trousers and shorts 2, dress 3, T-shirt 4, shirt 5, sweater 6, jacket 7; makeup order face 1, eye 2, lip 3. The player keeps their own eyebrows and eyelashes unless the outfit has that type. Ear and eye accessory types have no matching accessory type and are skipped and logged. The wardrobe preview and the server share one planner (`src/shared/CharacterOutfitAppearancePlanner.luau`) |
+| §1.7 | Titles, nameplate styles and stage entrance effects are built in code from interface instances, parts, tweens and at most one light: no images, particles or uploaded assets. Nameplate styles do not move |
+
+**Known weaknesses found and not fixed**
+
+- A final save whose write landed but whose answer was lost is retried, finds no lock, and is reported as a lost lock: the log says progress was discarded although it is stored, and the player is removed. On a quick rejoin the player removed is the one who just rejoined. Fixing it changes accepted behaviour and is left for a separate change.
+- `src/server/PlayerSaveDataKeeper.luau` (1,084 lines) and `tools/StylingItemPoolCsvCompiler.luau` (569 lines) exceed the 500-line rule for source files.
+- Nothing in this section has been checked in a published game. Sellability, purchases and commission remain for gate 2F.

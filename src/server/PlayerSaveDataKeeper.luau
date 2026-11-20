@@ -24,6 +24,14 @@
 --   Call when a player joins. Loads and locks the save in the background (retry every 5 s, at most
 --   6 retries). On success the "loaded" event fires. If loading never succeeds the player is
 --   removed from the game; a starting save is NEVER substituted for a save that failed to load.
+--   Quick rejoin to this server: when the player's previous session is still finishing (its
+--   final save, or a load that was in flight when they left), the new load waits inside the
+--   keeper and starts the moment that session has ended, right after its "session ended" event.
+--   If the player leaves again (or shutdown begins) while the new load waits, the waiting
+--   session never touches storage and ends with "LeftBeforeLoadFinished" right after the
+--   previous one. A previous session that ends without handing its lock back (final save
+--   abandoned) leaves the lock in storage, so the new load then waits for it like for any
+--   other server's lock (retries, then removal).
 -- keeper:isPlayerSaveDataLoaded(playerUserId) -> boolean
 --   True from the moment loading succeeds until the player starts leaving. When false, requests
 --   must be refused with `SaveDataNotLoaded`.
@@ -73,6 +81,11 @@
 -- EACH listener receives its own deep copy of the event value: nothing one listener does to
 -- what it received can change what another listener, or the keeper, sees. A listener that raises
 -- is logged and never disturbs saving or other listeners.
+-- Sessions of one player never overlap in what listeners see: every event about a player's
+-- session on this server comes after the "session ended" event of that player's previous
+-- session, so a listener may key its state by user id, create it on "loaded" and drop it on
+-- "session ended". Every session that was started ends with exactly one "session ended", and
+-- while one is fired the keeper reports no loaded save for that player.
 -- keeper:subscribeToPlayerSaveDataLoaded(listener(playerUserId, loadedSaveDataCopy))
 --   The save loaded and is locked by this server. The copy is exactly what storage now holds.
 -- keeper:subscribeToInMemorySaveDataChanged(listener(playerUserId, inMemorySaveDataCopy))
@@ -167,6 +180,9 @@ type PlayerSaveDataSession = {
 	isFinalSaveRequested: boolean,
 	finalSaveRetriesUsedCount: number,
 	cancelPendingFinalSaveRetry: (() -> ())?,
+	-- quick rejoin: this session's load waits until the previous session of the player has ended
+	isWaitingForPreviousSessionToEnd: boolean,
+	sessionWaitingForThisSessionToEnd: PlayerSaveDataSession?,
 }
 
 function PlayerSaveDataKeeper.new(dependencies)
@@ -355,6 +371,8 @@ local function describeUnsavedRevisionCount(session: PlayerSaveDataSession): str
 	)
 end
 
+local startLoadAttempt -- forward declaration
+
 local function endSession(self, session: PlayerSaveDataSession, sessionEndReason: string)
 	if session.sessionPhase == "Ended" then
 		return
@@ -369,6 +387,16 @@ local function endSession(self, session: PlayerSaveDataSession, sessionEndReason
 		string.format("PlayerSaveDataKeeper: session for player %d ended: %s", session.playerUserId, sessionEndReason)
 	)
 	fireEvent(self, "PlayerSaveDataSessionEnded", session.playerUserId, sessionEndReason)
+	-- Only now, after listeners heard this end, may the player's next session start loading.
+	local waitingSession = session.sessionWaitingForThisSessionToEnd
+	if waitingSession then
+		waitingSession.isWaitingForPreviousSessionToEnd = false
+		if waitingSession.isLeaveRequestedWhileLoading then
+			endSession(self, waitingSession, "LeftBeforeLoadFinished")
+		else
+			startLoadAttempt(self, waitingSession)
+		end
+	end
 	reportShutdownFinishedIfEverySessionEnded(self)
 end
 
@@ -635,10 +663,11 @@ local function startFinalSaveForSession(self, session: PlayerSaveDataSession)
 	end
 	if session.sessionPhase == "Loading" then
 		session.isLeaveRequestedWhileLoading = true
-		if not session.isLoadInFlight then
+		if not session.isLoadInFlight and not session.isWaitingForPreviousSessionToEnd then
 			endSession(self, session, "LeftBeforeLoadFinished")
 		end
-		-- Otherwise the in-flight load finishes first; see onLoadAttemptFinished.
+		-- Otherwise the in-flight load finishes first (see onLoadAttemptFinished), or the session
+		-- ends right after the previous session it waits for (see endSession).
 		return
 	end
 	if session.isFinalSaveRequested then
@@ -654,8 +683,6 @@ local function startFinalSaveForSession(self, session: PlayerSaveDataSession)
 end
 
 -- ── loading ─────────────────────────────────────────────────────────────────────────────────
-
-local startLoadAttempt -- forward declaration
 
 local function handleLoadAttemptNotTaken(self, session: PlayerSaveDataSession, whyNotTaken: string)
 	self.logger:logInformation(
@@ -828,8 +855,8 @@ function PlayerSaveDataKeeper:startLoadingPlayerSaveData(playerUserId: number)
 		)
 		return
 	end
-	-- A previous session still finishing its final save keeps running on its own; the new one
-	-- will find that session's lock and wait for it like any other server's lock.
+	-- A previous session still finishing (final save, or a load in flight when the player left)
+	-- keeps running on its own; this session's load starts only once that session has ended.
 	local session: PlayerSaveDataSession = {
 		playerUserId = playerUserId,
 		sessionLockId = self.generateUniqueSessionLockId(),
@@ -853,10 +880,16 @@ function PlayerSaveDataKeeper:startLoadingPlayerSaveData(playerUserId: number)
 		isFinalSaveRequested = false,
 		finalSaveRetriesUsedCount = 0,
 		cancelPendingFinalSaveRetry = nil,
+		isWaitingForPreviousSessionToEnd = existingSession ~= nil,
+		sessionWaitingForThisSessionToEnd = nil,
 	}
 	self.activeSessionByPlayerUserId[playerUserId] = session
 	self.unfinishedSessions[session] = true
-	startLoadAttempt(self, session)
+	if existingSession then
+		existingSession.sessionWaitingForThisSessionToEnd = session
+	else
+		startLoadAttempt(self, session)
+	end
 end
 
 local function findLoadedSessionAcceptingChanges(self, playerUserId: number): PlayerSaveDataSession?

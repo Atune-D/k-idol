@@ -25,6 +25,8 @@ local TABLE_CONSTRUCTOR_REASON_BY_ALLOWED_FILE_PATH = {
 	["src/server/PlayerSaveDataSchema.luau"] = "builds the starting save of a brand-new player (spec §1.10)",
 	["src/server/FanCountLeaderboardKeeper.luau"] = "builds leaderboard entries for devices from the cached top list",
 	["src/server/RobloxFanCountLeaderboardStorage.luau"] = "builds leaderboard entries from the ordered data store page",
+	["src/server/InMemoryDevelopmentFanCountLeaderboardStorage.luau"] = "builds leaderboard entries from the "
+		.. "in-memory development leaderboard (unpublished Studio place only)",
 }
 
 export type BalanceFieldAssignment = {

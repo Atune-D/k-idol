@@ -1,6 +1,7 @@
 local UnitTestFramework = require("../Support/UnitTestFramework")
 local FakeClock = require("../Support/FakeClock")
 local RemoteNames = require("../../src/shared/RemoteNames")
+local ThemedRoundProtocol = require("../../src/shared/ThemedRoundProtocol")
 local PlayerRequestRateLimiter = require("../../src/server/PlayerRequestRateLimiter")
 
 local describe, it, expect = UnitTestFramework.describe, UnitTestFramework.it, UnitTestFramework.expect
@@ -32,14 +33,9 @@ local SPEC_MINIMUM_INTERVAL_SECONDS_BY_CHANNEL = {
 	RequestFanCountLeaderboardTopEntries = 5,
 }
 
--- Spec §2: the channels the server sends on and a device never sends on.
-local SERVER_TO_DEVICE_CHANNEL_NAMES = {
-	"RoundStateChanged",
-	"RoundOutfitDraftAcknowledged",
-	"RoundResultsPublished",
-	"PlayerSaveDataSnapshotChanged",
-	"WardrobeCatalogChanged",
-}
+-- Spec §2 channel directions, recorded once in RemoteNames (and checked against §2 there).
+local DEVICE_SENT_CHANNEL_NAME_SET = RemoteNames.DEVICE_SENT_REMOTE_CHANNEL_NAME_SET
+local SERVER_SENT_CHANNEL_NAME_SET = RemoteNames.SERVER_SENT_REMOTE_CHANNEL_NAME_SET
 
 local ALLOWED = { isRequestAllowed = true }
 local TOO_MANY_REQUESTS = { isRequestAllowed = false, rejectionReason = "TooManyRequests" }
@@ -75,17 +71,25 @@ describe("PlayerRequestRateLimiter interval table (spec §2.13)", function()
 	end)
 
 	it("has an interval for every channel a device sends on", function()
-		for channelName in CHANNELS do
-			if not table.find(SERVER_TO_DEVICE_CHANNEL_NAMES, channelName) then
-				expect(rawget(INTERVAL_SECONDS_BY_CHANNEL, channelName) ~= nil).toBeTrue()
+		for channelName in DEVICE_SENT_CHANNEL_NAME_SET do
+			if rawget(INTERVAL_SECONDS_BY_CHANNEL, channelName) == nil then
+				error(channelName .. " is sent by a device but has no minimum interval")
 			end
 		end
 	end)
 
-	it("names only existing channels, and none the server sends on", function()
+	it("has no interval for any channel the server sends on", function()
+		for channelName in SERVER_SENT_CHANNEL_NAME_SET do
+			if rawget(INTERVAL_SECONDS_BY_CHANNEL, channelName) ~= nil then
+				error(channelName .. " is sent only by the server but has a minimum interval")
+			end
+		end
+	end)
+
+	it("names only existing channels a device sends on", function()
 		for channelName in INTERVAL_SECONDS_BY_CHANNEL do
 			expect(rawget(CHANNELS, channelName)).toBe(channelName)
-			expect(table.find(SERVER_TO_DEVICE_CHANNEL_NAMES, channelName)).toBeNil()
+			expect(rawget(DEVICE_SENT_CHANNEL_NAME_SET, channelName)).toBe(true)
 		end
 	end)
 
@@ -93,6 +97,20 @@ describe("PlayerRequestRateLimiter interval table (spec §2.13)", function()
 		expect(PlayerRequestRateLimiter.OUTFIT_DRAFT_SERVER_PROCESSING_INTERVAL_SECONDS).toBe(0.25)
 		expect(PlayerRequestRateLimiter.OUTFIT_DRAFT_SERVER_PROCESSING_INTERVAL_SECONDS).toBe(
 			INTERVAL_SECONDS_BY_CHANNEL[CHANNELS.SetRoundOutfitDraft]
+		)
+	end)
+
+	it("uses exactly the draft interval the device shares (ThemedRoundProtocol, §2.3)", function()
+		local sharedDraftIntervalSeconds = ThemedRoundProtocol.OUTFIT_DRAFT_SERVER_PROCESSING_INTERVAL_SECONDS
+		expect(PlayerRequestRateLimiter.OUTFIT_DRAFT_SERVER_PROCESSING_INTERVAL_SECONDS).toBe(
+			sharedDraftIntervalSeconds
+		)
+		expect(INTERVAL_SECONDS_BY_CHANNEL[CHANNELS.SetRoundOutfitDraft]).toBe(sharedDraftIntervalSeconds)
+		-- And the wait the referee is told is that same interval, in whole milliseconds.
+		local playerRequestRateLimiter = createLimiterWithFakeClock()
+		playerRequestRateLimiter:recordOutfitDraftProcessed(PLAYER)
+		expect(playerRequestRateLimiter:readMillisecondsUntilOutfitDraftMayBeProcessed(PLAYER)).toBe(
+			math.round(sharedDraftIntervalSeconds * 1000)
 		)
 	end)
 

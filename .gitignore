@@ -9,3 +9,16 @@ build/
 /*.rbxlx
 *.rbxl.lock
 *.rbxlx.lock
+
+# Claude Code: temporary working copies made by subagents, and per-machine settings
+.claude/worktrees/
+.claude/settings.local.json
+
+# Secrets and credentials must never be committed
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+.ROBLOSECURITY

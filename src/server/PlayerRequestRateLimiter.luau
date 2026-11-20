@@ -9,11 +9,15 @@
 -- ════════════════════════════════════════════════════════════════════════════════════════════
 --
 -- PlayerRequestRateLimiter.MINIMUM_REQUEST_INTERVAL_SECONDS_BY_REMOTE_CHANNEL_NAME
---   The §2.13 table: { [remoteChannelName]: minimumIntervalSeconds } for every channel a device
---   sends on (16 channels; the 5 server -> device channels are not in it). Frozen. Reading a
---   channel that is not in it raises an error naming the channel.
+--   The §2.13 table (src/shared/RequestChannelMinimumIntervals, read by the device too):
+--   { [remoteChannelName]: minimumIntervalSeconds } for exactly the channels in
+--   RemoteNames.DEVICE_SENT_REMOTE_CHANNEL_NAME_SET (16 channels; no channel of
+--   RemoteNames.SERVER_SENT_REMOTE_CHANNEL_NAME_SET is in it). Frozen. Reading a channel that is
+--   not in it raises an error naming the channel.
 -- PlayerRequestRateLimiter.OUTFIT_DRAFT_SERVER_PROCESSING_INTERVAL_SECONDS  (= 0.25, §2.3 check 3)
---   The `SetRoundOutfitDraft` entry of the table above, for the referee.
+--   The `SetRoundOutfitDraft` entry of the table above, for the referee. Both are taken from
+--   ThemedRoundProtocol.OUTFIT_DRAFT_SERVER_PROCESSING_INTERVAL_SECONDS (the value the device
+--   shares), so the three can never differ.
 --
 -- PlayerRequestRateLimiter.new(dependencies) -> limiter
 --   dependencies = {
@@ -68,6 +72,7 @@
 -- ════════════════════════════════════════════════════════════════════════════════════════════
 
 local RemoteNames = require("../shared/RemoteNames")
+local RequestChannelMinimumIntervals = require("../shared/RequestChannelMinimumIntervals")
 
 local REMOTE_CHANNEL_NAMES = RemoteNames.REMOTE_CHANNEL_NAMES
 
@@ -83,40 +88,11 @@ export type PlayerRequestRateLimiterDependencies = {
 local PlayerRequestRateLimiter = {}
 PlayerRequestRateLimiter.__index = PlayerRequestRateLimiter
 
-local function freezeWithErrorOnUnknownChannel(minimumIntervalSecondsByRemoteChannelName: { [string]: number })
-	setmetatable(minimumIntervalSecondsByRemoteChannelName, {
-		__index = function(_, unknownRemoteChannelName)
-			error(
-				string.format(
-					"PlayerRequestRateLimiter: %q is not a rate-limited request channel",
-					tostring(unknownRemoteChannelName)
-				),
-				2
-			)
-		end,
-	})
-	return table.freeze(minimumIntervalSecondsByRemoteChannelName)
-end
-
--- Spec §2.13, one entry per channel a device sends on.
-PlayerRequestRateLimiter.MINIMUM_REQUEST_INTERVAL_SECONDS_BY_REMOTE_CHANNEL_NAME = freezeWithErrorOnUnknownChannel({
-	[REMOTE_CHANNEL_NAMES.SetRoundOutfitDraft] = 0.25, -- coalesced rather than refused (§2.3)
-	[REMOTE_CHANNEL_NAMES.RequestWardrobeCatalogSnapshot] = 2,
-	[REMOTE_CHANNEL_NAMES.RequestStylingItemOwnership] = 0.5,
-	[REMOTE_CHANNEL_NAMES.RequestJoinCurrentRound] = 1,
-	[REMOTE_CHANNEL_NAMES.SetLobbyOutfit] = 2,
-	[REMOTE_CHANNEL_NAMES.RequestEquipDance] = 1,
-	[REMOTE_CHANNEL_NAMES.RequestEquipCosmetic] = 1,
-	[REMOTE_CHANNEL_NAMES.RequestPurchaseDanceWithStarCoins] = 1,
-	[REMOTE_CHANNEL_NAMES.RequestPurchaseCosmeticWithStarCoins] = 1,
-	[REMOTE_CHANNEL_NAMES.RequestClaimPlaytimeMilestone] = 1,
-	[REMOTE_CHANNEL_NAMES.RequestClaimDailyQuestReward] = 1,
-	[REMOTE_CHANNEL_NAMES.RequestStartDanceInLobby] = 0.5,
-	[REMOTE_CHANNEL_NAMES.RequestSyncDanceWithPlayer] = 0.5,
-	[REMOTE_CHANNEL_NAMES.RequestStopDanceInLobby] = 0.5,
-	[REMOTE_CHANNEL_NAMES.RequestRedeemPromoCode] = 2, -- answers TooManyAttempts (§2.10)
-	[REMOTE_CHANNEL_NAMES.RequestFanCountLeaderboardTopEntries] = 5,
-})
+-- Spec §2.13, one entry per channel a device sends on. The table lives in
+-- src/shared/RequestChannelMinimumIntervals.luau so that the device's request senders read the
+-- very same numbers (one home, no copy); this is the same frozen table, not a copy of it.
+PlayerRequestRateLimiter.MINIMUM_REQUEST_INTERVAL_SECONDS_BY_REMOTE_CHANNEL_NAME =
+	RequestChannelMinimumIntervals.MINIMUM_REQUEST_INTERVAL_SECONDS_BY_REMOTE_CHANNEL_NAME
 
 local OUTFIT_DRAFT_REMOTE_CHANNEL_NAME = REMOTE_CHANNEL_NAMES.SetRoundOutfitDraft
 local PROMO_CODE_REMOTE_CHANNEL_NAME = REMOTE_CHANNEL_NAMES.RequestRedeemPromoCode
